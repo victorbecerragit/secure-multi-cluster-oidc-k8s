@@ -1,0 +1,2 @@
+# Local OIDC certs for kind + Keycloak HTTPS bootstrap
+certs/

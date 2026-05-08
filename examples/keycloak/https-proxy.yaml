@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-https-proxy-config
+  namespace: keycloak
+data:
+  default.conf: |
+    server {
+      listen 8443 ssl;
+      server_name host.docker.internal;
+
+      ssl_certificate /etc/tls/tls.crt;
+      ssl_certificate_key /etc/tls/tls.key;
+      ssl_protocols TLSv1.2 TLSv1.3;
+
+      location / {
+        proxy_pass http://keycloak.keycloak.svc.cluster.local:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak-https-proxy
+  namespace: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak-https-proxy
+  template:
+    metadata:
+      labels:
+        app: keycloak-https-proxy
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 8443
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/tls
+              readOnly: true
+            - name: config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: keycloak-https-tls
+        - name: config
+          configMap:
+            name: keycloak-https-proxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-https-proxy
+  namespace: keycloak
+spec:
+  type: NodePort
+  selector:
+    app: keycloak-https-proxy
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+      nodePort: 30443

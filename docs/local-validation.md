@@ -5,23 +5,31 @@ This guide walks you through end‑to‑end validation of the OIDC authenticatio
 
 ## Prerequisites
 - `kind` clusters are up‑to‑date with the OIDC flags (see `kind/manager.yaml` / `workload.yaml`).
-- Keycloak is running on the **manager** cluster and reachable at `http://keycloak.local:30000`.
+- Keycloak is running on the **manager** cluster.
+- OIDC issuer is reachable at `https://host.docker.internal:30443/realms/kube-lab`.
+- Local OIDC CA is present at `certs/oidc-ca.crt`.
 - `kubelogin` (v0.0.28+), `kubectl`, `jq`, and `curl` are installed and in `$PATH`.
-- The `/etc/hosts` file contains `127.0.0.1 keycloak.local`.
+- Docker host mapping for `host.docker.internal` is working (validated by `scripts/bootstrap-kind.sh`).
 
 ## Users & Groups
 | User | Keycloak Group | Kubernetes Prefix |
 |------|----------------|-------------------|
-| `alice.admin` | `k8s-cluster-manager-platform-admin` | `oidc:k8s-cluster-manager-platform-admin` |
-| `bob.viewer` | `k8s-cluster-workload-developer-readonly` | `oidc:k8s-cluster-workload-developer-readonly` |
-| `ci.deployer` | `k8s-cluster-manager-ci-deployer` | `oidc:k8s-cluster-manager-ci-deployer` |
+| `alice.admin` | `platform-admins` | `oidc:platform-admins` |
+| `bob.viewer` | `developers` | `oidc:developers` |
+| `ci.deployer` | `ci-deployers` | `oidc:ci-deployers` |
 
 ## Validation Scripts
 Two scripts are provided in `scripts/`:
 - `validate-oidc.sh` – positive test cases (allowed actions).
 - `validate-oidc-negative.sh` – negative test cases (denied actions).
 
-Both scripts use `kubelogin` to obtain an OIDC token for a given user, then run `kubectl auth can-i` with the `--as-user` and `--as-group` flags.
+Both scripts validate using real OIDC bearer tokens from Keycloak (`kubelogin` first, `curl` fallback), then run `kubectl auth can-i` with `--token`.
+
+For troubleshooting only, you can allow impersonation fallback:
+
+```bash
+ALLOW_IMPERSONATION_FALLBACK=true ./scripts/validate-oidc.sh
+```
 
 ### Running the scripts
 ```bash
@@ -36,20 +44,22 @@ chmod +x scripts/validate-oidc.sh scripts/validate-oidc-negative.sh
 ```
 
 ## Expected Output
-The scripts print a brief table showing the command being executed and whether it succeeded (`yes`/`no`). Example of a successful check:
+Example of a successful check:
 ```
-[alice.admin] can-i create deployments --as-user=oidc:alice.admin --as-group=oidc:k8s-cluster-manager-platform-admin (manager) → yes
+[alice.admin] testing on kind-manager...
+✅ alice.admin allowed get nodes on kind-manager
 ```
 A denial looks like:
 ```
-[bob.viewer] can-i delete pods --as-user=oidc:bob.viewer --as-group=oidc:k8s-cluster-workload-developer-readonly (workload) → no (expected)
+[bob.viewer] testing on kind-workload...
+❌ bob.viewer denied delete pods on kind-workload
 ```
 
 ## Common Failure Points
-1. **Missing `/etc/hosts` entry** – Keycloak discovery fails; the scripts will abort with `Issuer URL not reachable`.
+1. **Missing local certs** – Run `bash scripts/ensure-oidc-certs.sh` before creating clusters.
 2. **Keycloak not started** – Ensure `bootstrap-kind.sh` has run and the Keycloak pod is ready (`kubectl -n keycloak get pods`).
 3. **`kubelogin` version** – Older versions do not support the `--oidc-issuer-url` flag. Upgrade if you see `unknown flag` errors.
-4. **Incorrect group prefix** – The RBAC bindings must use the `oidc:` prefix; otherwise `kubectl auth can-i` will return `no` even for allowed actions.
+4. **Incorrect group mapping** – The RBAC bindings use `oidc:platform-admins`, `oidc:ci-deployers`, and `oidc:developers`.
 
 ## Cleaning Up
 ```bash

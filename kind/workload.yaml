@@ -3,12 +3,17 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
   image: kindest/node:v1.30.0
+  extraMounts:
+  - hostPath: ./certs/oidc-ca.crt
+    containerPath: /etc/kubernetes/pki/oidc/ca.crt
+    readOnly: true
   kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
     apiServer:
       extraArgs:
-        oidc-issuer-url: "http://keycloak.local:30000/realms/kube-lab"
+        oidc-issuer-url: "https://host.docker.internal:30443/realms/kube-lab"
+        oidc-ca-file: "/etc/kubernetes/pki/oidc/ca.crt"
         oidc-client-id: "kubernetes"
         oidc-username-claim: "preferred_username"
         oidc-username-prefix: "oidc:"

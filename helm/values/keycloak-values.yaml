@@ -3,6 +3,12 @@ auth:
   adminUser: admin
   adminPassword: admin-password
 
+image:
+  registry: docker.io
+  repository: bitnamilegacy/keycloak
+  tag: 26.3.3-debian-12-r0
+  pullPolicy: IfNotPresent
+
 service:
   type: NodePort
   nodePorts:
@@ -21,12 +27,15 @@ extraEnvVars:
   - name: KC_LOG_LEVEL
     value: INFO
 
-# Ensure Keycloak can be reached via keycloak.local
+# Ensure Keycloak is reachable for local kind-based access
 proxy: edge
 
 # Persistence disabled for local ephemeral testing
 postgresql:
   enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
   auth:
     database: keycloak
     username: bn_keycloak

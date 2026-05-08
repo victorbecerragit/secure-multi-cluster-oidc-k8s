@@ -4,6 +4,9 @@
 set -e
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+bash "$REPO_ROOT/scripts/ensure-oidc-certs.sh"
 
 function create_cluster() {
     local name=$1
@@ -30,33 +33,49 @@ function create_cluster() {
     kubectl apply -f "$REPO_ROOT/policies/network/"
 }
 
-# Ensure kind and helm are installed
-for cmd in kind helm jq curl; do
+# Ensure prerequisites are installed
+for cmd in kind helm jq curl openssl; do
     if ! command -v $cmd &> /dev/null; then
         echo "Error: $cmd is not installed. Please install it first."
         exit 1
     fi
 done
 
-# Check for keycloak.local in /etc/hosts
-if ! grep -q "keycloak.local" /etc/hosts; then
-    echo "WARNING: 'keycloak.local' not found in /etc/hosts."
-    echo "Please add the following line to your /etc/hosts file:"
-    echo "127.0.0.1 keycloak.local"
-    echo
-    read -p "Press Enter to continue after adding it, or Ctrl+C to abort..."
+# Verify Docker host hostname mapping for Keycloak
+if ! ping -c1 -W1 host.docker.internal > /dev/null 2>&1; then
+    echo "WARNING: 'host.docker.internal' not reachable from this environment."
+    echo "If you are using Docker on Linux, ensure you run the Docker daemon with '--add-host=host.docker.internal:host-gateway' or use the 'host-gateway' feature."
+    echo "Alternatively, add an entry to /etc/hosts mapping host.docker.internal to your Docker host IP."
+    read -p "Press Enter to continue after fixing host mapping, or Ctrl+C to abort..."
 fi
 
 create_cluster "manager" "$REPO_ROOT/kind/manager.yaml"
 
-# Setup Keycloak on manager cluster
+# Setup Keycloak on manager cluster before OIDC reachability checks
 bash "$REPO_ROOT/scripts/setup-keycloak.sh"
+
+    # Verify OIDC issuer reachability from manager control-plane.
+    # NodePort 30443 is bound on the kind node itself, not on the Docker host.
+    # From inside the container, use --resolve to map host.docker.internal:30443
+    # to 127.0.0.1 so curl hits the local NodePort while still using the correct
+    # SNI/hostname for TLS certificate verification against the mounted CA.
+    echo "Checking OIDC issuer reachability from control-plane..."
+    docker exec manager-control-plane curl -s \
+        --cacert /etc/kubernetes/pki/oidc/ca.crt \
+        --resolve host.docker.internal:30443:127.0.0.1 \
+        -o /dev/null -w "%{http_code}" \
+        https://host.docker.internal:30443/realms/kube-lab || {
+      echo "ERROR: Cannot reach OIDC issuer from kind control-plane."
+      exit 1
+    }
+
 
 create_cluster "workload" "$REPO_ROOT/kind/workload.yaml"
 
 echo
 echo "Bootstrap complete."
-echo "Keycloak: http://keycloak.local:30000"
+echo "Keycloak HTTP (admin): http://host.docker.internal:30000"
+echo "OIDC Issuer HTTPS: https://host.docker.internal:30443/realms/kube-lab"
 echo "Contexts: kind-manager, kind-workload"
 echo
-echo "To test OIDC login, refer to docs/local-testing-oidc.md"
+echo "To test OIDC login, refer to docs/local-validation.md"
