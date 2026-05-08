@@ -8,8 +8,9 @@ nodes:
     kind: ClusterConfiguration
     apiServer:
       extraArgs:
-        oidc-issuer-url: "http://keycloak.local:30000/realms/k8s"
+        oidc-issuer-url: "http://keycloak.local:30000/realms/kube-lab"
         oidc-client-id: "kubernetes"
-        oidc-username-claim: "email"
+        oidc-username-claim: "preferred_username"
+        oidc-username-prefix: "oidc:"
         oidc-groups-claim: "groups"
         oidc-groups-prefix: "oidc:"

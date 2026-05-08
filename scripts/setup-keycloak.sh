@@ -33,18 +33,18 @@ ADMIN_TOKEN=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-conne
   -d "grant_type=password" \
   -d "client_id=admin-cli" | jq -r '.access_token')
 
-# Create Realm k8s
+# Create Realm kube-lab
 curl -s -X POST "$KEYCLOAK_URL/admin/realms" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "realm": "k8s",
+    "realm": "kube-lab",
     "enabled": true,
-    "displayName": "Kubernetes OIDC"
+    "displayName": "Kubernetes OIDC Lab"
   }'
 
 # Create Client kubernetes
-curl -s -X POST "$KEYCLOAK_URL/admin/realms/k8s/clients" \
+curl -s -X POST "$KEYCLOAK_URL/admin/realms/kube-lab/clients" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -59,9 +59,9 @@ curl -s -X POST "$KEYCLOAK_URL/admin/realms/k8s/clients" \
   }'
 
 # Add Protocol Mapper for Groups
-CLIENT_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$KEYCLOAK_URL/admin/realms/k8s/clients?clientId=kubernetes" | jq -r '.[0].id')
+CLIENT_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$KEYCLOAK_URL/admin/realms/kube-lab/clients?clientId=kubernetes" | jq -r '.[0].id')
 
-curl -s -X POST "$KEYCLOAK_URL/admin/realms/k8s/clients/$CLIENT_ID/protocol-mappers/models" \
+curl -s -X POST "$KEYCLOAK_URL/admin/realms/kube-lab/clients/$CLIENT_ID/protocol-mappers/models" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -78,8 +78,9 @@ curl -s -X POST "$KEYCLOAK_URL/admin/realms/k8s/clients/$CLIENT_ID/protocol-mapp
   }'
 
 # Create Groups
-curl -s -X POST "$KEYCLOAK_URL/admin/realms/k8s/groups" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"name": "platform-admins"}'
-curl -s -X POST "$KEYCLOAK_URL/admin/realms/k8s/groups" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"name": "developers"}'
+curl -s -X POST "$KEYCLOAK_URL/admin/realms/kube-lab/groups" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"name": "k8s-cluster-manager-platform-admin"}'
+curl -s -X POST "$KEYCLOAK_URL/admin/realms/kube-lab/groups" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"name": "k8s-cluster-manager-ci-deployer"}'
+curl -s -X POST "$KEYCLOAK_URL/admin/realms/kube-lab/groups" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d '{"name": "k8s-cluster-workload-developer-readonly"}'
 
 # Create Users
 function create_user() {
@@ -88,26 +89,27 @@ function create_user() {
   local group=$3
 
   echo "Creating user $username..."
-  curl -s -X POST "$KEYCLOAK_URL/admin/realms/k8s/users" \
+  curl -s -X POST "$KEYCLOAK_URL/admin/realms/kube-lab/users" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d "{
       \"username\": \"$username\",
       \"enabled\": true,
-      \"email\": \"$username\",
+      \"email\": \"$username@example.com\",
       \"firstName\": \"$username\",
       \"credentials\": [{\"type\": \"password\", \"value\": \"$password\", \"temporary\": false}]
     }"
 
-  USER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$KEYCLOAK_URL/admin/realms/k8s/users?username=$username" | jq -r '.[0].id')
-  GROUP_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$KEYCLOAK_URL/admin/realms/k8s/groups?search=$group" | jq -r '.[0].id')
+  USER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$KEYCLOAK_URL/admin/realms/kube-lab/users?username=$username" | jq -r '.[0].id')
+  GROUP_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$KEYCLOAK_URL/admin/realms/kube-lab/groups?search=$group" | jq -r '.[0].id')
 
-  curl -s -X PUT "$KEYCLOAK_URL/admin/realms/k8s/users/$USER_ID/groups/$GROUP_ID" \
+  curl -s -X PUT "$KEYCLOAK_URL/admin/realms/kube-lab/users/$USER_ID/groups/$GROUP_ID" \
     -H "Authorization: Bearer $ADMIN_TOKEN"
 }
 
-create_user "admin@example.com" "admin-password" "platform-admins"
-create_user "dev@example.com" "dev-password" "developers"
+create_user "alice.admin" "password123" "k8s-cluster-manager-platform-admin"
+create_user "bob.viewer" "password123" "k8s-cluster-workload-developer-readonly"
+create_user "ci.deployer" "password123" "k8s-cluster-manager-ci-deployer"
 
 echo "=== Keycloak Setup Complete ==="
-echo "Issuer URL: $KEYCLOAK_URL/realms/k8s"
+echo "Issuer URL: $KEYCLOAK_URL/realms/kube-lab"
