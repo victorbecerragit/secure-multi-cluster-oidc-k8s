@@ -1,0 +1,26 @@
+name: Validate Workload Cluster (OIDC)
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Simulate Read-Only Audit
+        run: |
+          echo "Persona: oidc:developers (Read-only)"
+          echo "Target Namespace: app-staging"
+          echo "Cluster: workload"
+          
+          # Simulation of validation command
+          # kubectl get pods -n app-staging
+          echo "Audit complete: No security violations found (Simulated)"

@@ -1,0 +1,50 @@
+name: Deploy to Manager Cluster (OIDC)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'examples/**'
+      - 'helm/**'
+
+# This is critical for OIDC: allows the job to request the JWT from GitHub's OIDC provider
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # STEP: OIDC Authentication
+      # -----------------------------------------------------------------------
+      # This step represents where you would use a cloud-specific action to exchange 
+      # the GitHub OIDC token for cluster access.
+      # 
+      # Example for EKS:
+      # - name: Configure AWS Credentials
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: arn:aws:iam::123456789012:role/gha-ci-deployer
+      #     aws-region: us-east-1
+      #
+      # Example for Self-Hosted/Direct OIDC:
+      # - name: Setup K8s Context
+      #   run: |
+      #     echo "${{ steps.auth.outputs.id_token }}" > ./token.jwt
+      #     kubectl config set-credentials oidc --token-file=./token.jwt
+      # -----------------------------------------------------------------------
+
+      - name: Simulate Deployment
+        run: |
+          echo "Persona: oidc:ci-deployers"
+          echo "Target Namespace: app-prod"
+          echo "Cluster: manager"
+          
+          # Simulation of deployment command
+          # kubectl apply -f examples/namespaces/app-namespaces.yaml
+          echo "Deployment successful (Simulated)"
