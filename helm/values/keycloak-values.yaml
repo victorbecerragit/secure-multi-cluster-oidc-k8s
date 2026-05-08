@@ -1,0 +1,33 @@
+# keycloak-values.yaml
+auth:
+  adminUser: admin
+  adminPassword: admin-password
+
+service:
+  type: NodePort
+  nodePorts:
+    http: 30000
+
+# Disable TLS for local dev simplicity (standard for kind OIDC demos)
+# In production, this MUST be enabled.
+httpRelativePath: /
+extraEnvVars:
+  - name: KC_HTTP_ENABLED
+    value: "true"
+  - name: KC_HOSTNAME_STRICT
+    value: "false"
+  - name: KC_HOSTNAME_STRICT_HTTPS
+    value: "false"
+  - name: KC_LOG_LEVEL
+    value: INFO
+
+# Ensure Keycloak can be reached via keycloak.local
+proxy: edge
+
+# Persistence disabled for local ephemeral testing
+postgresql:
+  enabled: true
+  auth:
+    database: keycloak
+    username: bn_keycloak
+    password: keycloak-password
