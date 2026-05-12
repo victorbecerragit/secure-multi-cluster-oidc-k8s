@@ -1,10 +1,8 @@
 package kube
 
 import (
-	"errors"
-	"fmt" // Added for logging
 	"io/ioutil"
-	"os" // Added for file operations
+	"os"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
@@ -68,41 +66,17 @@ func ListClusters() ([]string, error) {
 
 func SwitchContext(cluster string) error {
 	configAccess := clientcmd.NewDefaultPathOptions()
-	kubeconfigPath := configAccess.GetDefaultFilename()
-
-	// --- Backup Mechanism ---
-	originalKubeconfig, err := os.ReadFile(kubeconfigPath)
-	if err != nil {
-		// If we can't read the original, we can't back it up, but we might still proceed.
-		fmt.Fprintf(os.Stderr, "Warning: Could not read original kubeconfig for backup: %v\n", err)
-	} else {
-		backupPath := kubeconfigPath + ".bak"
-		if err := os.WriteFile(backupPath, originalKubeconfig, 0600); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Could not create kubeconfig backup at %s: %v\n", backupPath, err)
-		} else {
-			fmt.Fprintf(os.Stdout, "Kubeconfig backed up to %s\n", backupPath)
-		}
-	}
-	// --- End Backup Mechanism ---
-
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	foundContext := ""
-	for name, ctx := range config.Contexts {
-		if ctx.Cluster == cluster {
-			foundContext = name
-			break
-		}
+	targetContext, err := resolveContextName(config, cluster)
+	if err != nil {
+		return err
 	}
 
-	if foundContext == "" {
-		return errors.New("no context found for cluster: " + cluster)
-	}
-
-	config.CurrentContext = foundContext
+	config.CurrentContext = targetContext
 	return clientcmd.ModifyConfig(configAccess, *config, true)
 }
 

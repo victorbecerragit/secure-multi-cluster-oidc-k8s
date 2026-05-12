@@ -5,7 +5,9 @@ A minimal CLI for secure, user-friendly access to multiple Kubernetes clusters u
 ## Commands
 - `login`      Authenticate via OIDC (Keycloak)
 - `clusters`   List available clusters (requires login)
-- `switch`     Switch current context to a cluster (requires login)
+- `use`        Switch current context using logical cluster or context name (requires login)
+- `switch`     Deprecated alias for `use`
+- `can-i`      Run `kubectl auth can-i` under the selected context (requires login)
 - `whoami`     Show current identity/context (requires login)
 - `validate`   Validate access to a cluster (requires login)
 
@@ -42,7 +44,12 @@ The login command will attempt OIDC device code flow. If not implemented, see be
 
 ### Cluster Discovery & Context Switching
 
-The `clusters` command lists all clusters found in your kubeconfig. The `switch` command sets the current context to the specified cluster (by name). Both require a valid OIDC login and a readable kubeconfig file (usually at `${HOME}/.kube/config`).
+The `clusters` command lists all clusters found in your kubeconfig. The `use` command sets the current context using either:
+
+- a logical cluster name (`manager`, `workload`), or
+- an explicit kubeconfig context name.
+
+Both require a valid OIDC login and a readable kubeconfig file (usually at `${HOME}/.kube/config`).
 
 Example:
 
@@ -53,9 +60,11 @@ Example:
 # - manager
 # - workload
 
-./fcli switch workload
+./fcli use workload
 # Output:
-# Switched context to 'workload'
+# Current context: kind-manager
+# Target context:  kind-workload
+# Context updated successfully.
 ```
 
 ### Token Caching

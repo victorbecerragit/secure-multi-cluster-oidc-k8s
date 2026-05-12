@@ -46,9 +46,29 @@ func TestSwitchContext(t *testing.T) {
 		t.Fatalf("LoadKubeConfig failed: %v", err)
 	}
 	origContext := cfg.CurrentContext
+	currentCluster := ""
+	for _, ctx := range cfg.Contexts {
+		if ctx.Name == origContext {
+			currentCluster = ctx.Context.Cluster
+			break
+		}
+	}
+	if currentCluster == "" {
+		t.Fatalf("unable to determine cluster for current context %q", origContext)
+	}
 
-	// Switch to the second cluster
-	if err := kube.SwitchContext(clusters[1]); err != nil {
+	targetCluster := ""
+	for _, c := range clusters {
+		if c != currentCluster {
+			targetCluster = c
+			break
+		}
+	}
+	if targetCluster == "" {
+		t.Skip("No alternate cluster available for context switching test")
+	}
+
+	if err := kube.SwitchContext(targetCluster); err != nil {
 		t.Fatalf("SwitchContext failed: %v", err)
 	}
 	cfg2, err := kube.LoadKubeConfig()

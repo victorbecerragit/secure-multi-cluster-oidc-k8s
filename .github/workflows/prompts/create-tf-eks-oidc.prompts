@@ -1,0 +1,72 @@
+I want to continue this repository by adding Terraform templates for AWS EKS and GitHub Actions OIDC integration.
+
+Project context:
+- This repo already contains a local kind + Keycloak OIDC lab for secure multi-cluster Kubernetes access.
+- Now I want a cloud path for AWS EKS.
+- I want GitHub Actions to authenticate to AWS using OIDC with short-lived credentials, not static access keys.
+- The solution should be secure, modular, and interview-ready.
+
+What I want implemented:
+1. Terraform templates for EKS
+2. Terraform templates for GitHub OIDC to AWS
+3. GitHub Actions workflows for Terraform plan/apply using OIDC
+4. Documentation for the trust model and deployment flow
+
+Requirements:
+- Add an AWS Terraform structure under something like:
+  - infra/terraform/aws/modules/eks-cluster
+  - infra/terraform/aws/modules/github-oidc-role
+  - infra/terraform/aws/environments/dev
+- Use a modular structure with variables and outputs
+- Support one initial EKS cluster first, with room to extend later
+- Create the AWS IAM OIDC provider for token.actions.githubusercontent.com
+- Create a GitHub Actions IAM role with a strict trust policy:
+  - aud = sts.amazonaws.com
+  - sub restricted to my exact GitHub repo and branch or environment
+- Do not use long-lived AWS keys
+- Add EKS access configuration for the GitHub role so it can access the cluster safely
+- Keep least privilege in mind
+- Add example GitHub Actions workflows for:
+  - terraform fmt/validate/plan
+  - terraform apply
+  - optional deploy to EKS
+- Add README/docs explaining:
+  - trust relationship
+  - required GitHub permissions
+  - required AWS bootstrap steps
+  - how Terraform and GitHub Actions interact
+  - how EKS auth works after role assumption
+
+Design guidance:
+- Keep the Terraform interview-friendly and readable
+- Avoid overengineering
+- Prefer one environment (dev) first
+- Use comments only where they explain security intent
+- Reuse patterns already present in the repo where sensible
+
+Acceptance criteria:
+1. Terraform structure is created for AWS EKS and GitHub OIDC
+2. The GitHub OIDC IAM provider and role are defined in Terraform
+3. The trust policy is tightly scoped to repo/branch/environment
+4. Example GitHub Actions workflows use OIDC, not secrets
+5. EKS access for the GitHub role is documented and scaffolded
+6. README/docs clearly explain the setup and security model
+7. The code is modular enough to extend later
+
+Please work in phases:
+Phase 1:
+- Propose the file tree and implementation plan
+
+Phase 2:
+- Generate the Terraform module skeletons and environment files
+
+Phase 3:
+- Implement the GitHub OIDC IAM provider, trust policy, and role
+
+Phase 4:
+- Implement the EKS module skeleton and outputs
+
+Phase 5:
+- Add GitHub Actions workflows and documentation
+
+Before editing files, show me the implementation plan and proposed file tree.
