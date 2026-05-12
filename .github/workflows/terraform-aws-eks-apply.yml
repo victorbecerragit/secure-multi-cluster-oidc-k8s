@@ -38,6 +38,9 @@ jobs:
       TF_VAR_github_repo: ${{ github.event.repository.name }}
       TF_VAR_github_subject_type: environment
       TF_VAR_github_subject_value: dev
+      # Bootstrap already created the GitHub OIDC provider; skip re-creation to avoid 409.
+      TF_VAR_create_github_oidc_provider: "false"
+      TF_VAR_existing_github_oidc_provider_arn: "arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:oidc-provider/token.actions.githubusercontent.com"
     # Skip the entire job until the OIDC role has been bootstrapped locally.
     # Set AWS_GITHUB_OIDC_ROLE_ARN in repository/environment variables to enable.
     if: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN != '' }}
