@@ -1,2 +1,12 @@
 # Local OIDC certs for kind + Keycloak HTTPS bootstrap
 certs/
+
+# Terraform local artifacts under infra/
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/*.tfplan
+infra/**/terraform.tfvars
+infra/**/terraform.tfvars.json
+infra/**/crash.log
+infra/**/crash.*.log

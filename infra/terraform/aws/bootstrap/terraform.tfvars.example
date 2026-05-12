@@ -1,0 +1,23 @@
+# AWS Bootstrap Configuration
+# Copy this file to terraform.tfvars and update with your GitHub repository details.
+
+aws_region = "us-east-1"
+
+# GitHub repository where the workflows run
+github_owner = "victorbecerragit"
+github_repo  = "secure-multi-cluster-oidc-k8s"
+
+# Trust policy scope: which branch or environment can exchange tokens
+github_subject_type  = "branch"
+github_subject_value = "main"
+
+# IAM role name (will be prefixed with account ID for uniqueness)
+role_name = "github-actions-oidc-role"
+
+# Tags applied to all resources
+tags = {
+  Project     = "secure-multi-cluster-oidc-k8s"
+  Component   = "bootstrap"
+  ManagedBy   = "Terraform"
+  Owner       = "DevSecOps"
+}

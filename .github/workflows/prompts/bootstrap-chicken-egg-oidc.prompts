@@ -1,0 +1,130 @@
+# Bootstrap GitHub Actions OIDC for AWS – Implementation Complete ✅
+
+## Problem Solved
+GitHub Actions CI/CD requires AWS IAM credentials to deploy infrastructure. Using OIDC federation eliminates the need for static secrets, but it creates a **chicken-and-egg problem**: the role can't exist until the infrastructure stack is deployed, but the workflow can't run until the role exists.
+
+## Solution Implemented
+Created a **separate bootstrap layer** at `infra/terraform/aws/bootstrap/` that:
+- Creates the GitHub OIDC provider (account-level, one-time)
+- Creates a minimal GitHub Actions IAM role
+- Outputs the role ARN for use in workflows
+- Can be applied locally before any workflows run
+
+## Files Created
+
+### Core Infrastructure Files
+
+**`infra/terraform/aws/bootstrap/versions.tf`**
+- Terraform version constraints (>= 1.5)
+- AWS provider v5.0+
+- TLS provider for certificate handling
+
+**`infra/terraform/aws/bootstrap/main.tf`**
+- Uses the reusable `../modules/github-oidc-role` module
+- Creates GitHub OIDC provider (idempotent)
+- Creates IAM role with strict trust policy
+- Trust policy scoped to: `repo:owner/repo:ref:refs/heads/main`
+- No inline or managed policies (lean design)
+
+**`infra/terraform/aws/bootstrap/variables.tf`**
+- `aws_region` – AWS region (default: us-east-1)
+- `github_owner` – GitHub org/user
+- `github_repo` – Repository name
+- `github_subject_type` – "branch" or "environment"
+- `github_subject_value` – Branch name or environment (default: main)
+- `role_name` – IAM role name (account ID prefixed for uniqueness)
+- `tags` – Common tags for all resources
+
+**`infra/terraform/aws/bootstrap/outputs.tf`**
+- `github_oidc_role_arn` – **Primary output for GitHub secrets**
+- `github_oidc_role_name` – Role name for reference
+- `github_oidc_provider_arn` – Provider ARN (account-level resource)
+- `github_subject_claim` – Exact subject claim (for debugging)
+
+**`infra/terraform/aws/bootstrap/terraform.tfvars.example`**
+- Example configuration with your repository details
+- Copy to `terraform.tfvars` and populate with GitHub repo info
+
+### Documentation
+
+**`infra/terraform/aws/bootstrap/README.md`**
+Comprehensive guide covering:
+- **The Problem**: Detailed explanation of the chicken-and-egg scenario
+- **The Solution**: Architecture diagram showing bootstrap → EKS deployment flow
+- **Security Design**: Trust policy scope, minimal permissions, OIDC specifics
+- **Quick Start**: 4-step setup process
+  1. Configure terraform.tfvars
+  2. Apply bootstrap (local)
+  3. Capture role ARN
+  4. Set GitHub repository secret
+- **Usage in Workflows**: Example workflow configuration
+- **Troubleshooting**: Common issues and fixes
+- **Extending**: Multi-environment and multi-org patterns
+- **Next Steps**: Path to full EKS deployment
+
+## Security Properties
+
+### Trust Policy Scope
+✅ Limited to **exact GitHub repository**  
+✅ Limited to **specific branch** (main) or environment  
+✅ Limited to **sts.amazonaws.com** audience  
+✅ No cross-account or cross-repo token exchange possible  
+
+### Minimal Permissions
+✅ Bootstrap role has **no policies attached**  
+✅ Separate CI/CD role in main stack handles EKS/IAM/VPC permissions  
+✅ Follows least-privilege principle  
+
+### Provider Security
+✅ GitHub OIDC provider uses official certificate thumbprint  
+✅ Account-level provider (shared across workflows)  
+✅ Idempotent creation (safe to rerun)  
+
+## Workflow Integration
+
+In your GitHub Actions workflow:
+
+```yaml
+- name: Assume AWS Role via OIDC
+  uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+    aws-region: us-east-1
+```
+
+The workflow will:
+1. Generate an OIDC token signed by GitHub
+2. Call AWS STS AssumeRoleWithWebIdentity
+3. Exchange token for temporary AWS credentials
+4. Authenticate to AWS for infrastructure deployment
+
+## Next Steps
+
+1. **Apply bootstrap locally**:
+   ```bash
+   cd infra/terraform/aws/bootstrap
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars with your GitHub repo details
+   terraform init && terraform apply
+   ```
+
+2. **Capture the role ARN**:
+   ```bash
+   terraform output github_oidc_role_arn
+   ```
+
+3. **Set GitHub repository secret**:
+   - Settings → Secrets and variables → Actions
+   - Name: `AWS_GITHUB_OIDC_ROLE_ARN`
+   - Value: Paste the role ARN
+
+4. **Deploy the main EKS stack** via workflow using the role from step 3
+
+## Reusability
+
+The bootstrap layer demonstrates:
+- ✅ Modular Terraform with reusable module pattern
+- ✅ Security-first OIDC configuration
+- ✅ Clean separation of concerns (bootstrap vs. application)
+- ✅ Interview-ready documentation
+- ✅ Extensible architecture (multi-env, multi-org)
