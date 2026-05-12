@@ -138,9 +138,9 @@ bash scripts/setup-keycloak.sh
 This is idempotent — safe to re-run. It creates:
 | User | Password | Group | RBAC role |
 |------|----------|-------|-----------|
-| `alice.admin` | `Admin1234!` | `platform-admins` | Platform admin |
-| `bob.viewer` | `Viewer1234!` | `developers` | Read-only |
-| `ci.deployer` | `Deploy1234!` | `ci-deployers` | Namespace deploy |
+| `alice.admin` | `password123` | `platform-admins` | Platform admin |
+| `bob.viewer` | `password123` | `developers` | Read-only |
+| `ci.deployer` | `password123` | `ci-deployers` | Namespace deploy |
 
 ### 3 — Validate end-to-end OIDC + RBAC
 
@@ -161,7 +161,7 @@ The script fetches a real JWT from Keycloak for each user and calls `kubectl aut
 ```bash
 # Fetch alice's token
 TOKEN=$(curl -s --resolve host.docker.internal:30443:127.0.0.1 \
-  -d "client_id=kube-oidc&grant_type=password&username=alice.admin&password=Admin1234!" \
+  -d "client_id=kube-oidc&grant_type=password&username=alice.admin&password=password123" \
   https://host.docker.internal:30443/realms/kube-lab/protocol/openid-connect/token \
   | jq -r .access_token)
 

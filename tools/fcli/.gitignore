@@ -1,0 +1,11 @@
+# Go build
+/bin/
+*.exe
+*.test
+*.out
+# Local config
+.env
+*.local
+# IDE
+.vscode/
+.idea/

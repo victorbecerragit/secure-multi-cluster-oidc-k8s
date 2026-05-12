@@ -140,6 +140,7 @@ ensure_client() {
       "directAccessGrantsEnabled": true,
       "redirectUris": ["http://localhost:8000", "http://localhost:18000"],
       "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
         "post.logout.redirect.uris": "+"
       }
     }'
@@ -154,6 +155,7 @@ ensure_client() {
       "standardFlowEnabled": true,
       "redirectUris": ["http://localhost:8000", "http://localhost:18000"],
       "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
         "post.logout.redirect.uris": "+"
       }
     }'
