@@ -16,6 +16,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: dev
+    # Skip the entire job until the OIDC role has been bootstrapped locally.
+    # Set AWS_GITHUB_OIDC_ROLE_ARN in repository/environment variables to enable.
+    if: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

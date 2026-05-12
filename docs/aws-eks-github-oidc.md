@@ -45,14 +45,36 @@ permissions:
 
 ## AWS Bootstrap Steps
 
-1. Choose the AWS account and region for the dev cluster.
-2. Decide whether Terraform will create the GitHub OIDC provider or reuse an existing one.
-3. Copy [infra/terraform/aws/environments/dev/terraform.tfvars.example](/home/victorbecerra/antigravity/kube-secure-oicd/infra/terraform/aws/environments/dev/terraform.tfvars.example) to a local `terraform.tfvars`.
-4. Review the default inline CI policy in [infra/terraform/aws/environments/dev/main.tf](/home/victorbecerra/antigravity/kube-secure-oicd/infra/terraform/aws/environments/dev/main.tf) and remove any unused service actions before production use.
-5. Apply Terraform locally once, then copy these outputs into GitHub repository variables:
-   - `AWS_GITHUB_OIDC_ROLE_ARN`
-   - `AWS_REGION`
-   - `AWS_EKS_CLUSTER_NAME`
+The workflows guard themselves with `if: vars.AWS_GITHUB_OIDC_ROLE_ARN != ''` and skip
+gracefully until the one-time local bootstrap is complete. This avoids spurious failures
+on every push before the OIDC role exists in AWS.
+
+### One-time local bootstrap (static credentials required once)
+
+1. Configure local AWS credentials with enough permissions to create IAM roles, an OIDC
+   provider, a VPC, and an EKS cluster (e.g., `aws configure` or an IAM Identity Center
+   session).
+2. Copy `terraform.tfvars.example` to `terraform.tfvars` and fill in your values:
+   ```
+   cd infra/terraform/aws/environments/dev
+   cp terraform.tfvars.example terraform.tfvars
+   # edit aws_region, cluster_name, github_owner, github_repo, subject_value
+   ```
+3. Review the inline CI policy in `main.tf` and remove any service actions you don't need.
+4. Apply once:
+   ```
+   terraform init
+   terraform apply
+   ```
+5. Capture the outputs and set them as GitHub repository variables
+   (`Settings > Secrets and variables > Variables`):
+   | Variable | Terraform output |
+   |---|---|
+   | `AWS_GITHUB_OIDC_ROLE_ARN` | `aws_github_oidc_role_arn` |
+   | `AWS_REGION` | your chosen region (e.g. `us-east-1`) |
+   | `AWS_EKS_CLUSTER_NAME` | `eks_cluster_name` |
+
+After step 5 the workflows unblock automatically — no workflow file changes needed.
 
 ## Terraform and GitHub Actions Interaction
 
