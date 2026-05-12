@@ -35,6 +35,8 @@ Tokens are valid only for the duration of the job, significantly reducing the bl
 ### AWS (EKS)
 Use `aws-actions/configure-aws-credentials` to exchange the OIDC token for an IAM Role, which is then mapped to a K8s user via the `aws-auth` ConfigMap or EKS Access Entries.
 
+This repository now includes an AWS-specific Terraform scaffold and example workflows under `infra/terraform/aws/` and `.github/workflows/terraform-aws-eks-*.yml`. See `docs/aws-eks-github-oidc.md` for the concrete trust model and bootstrap flow.
+
 ### GCP (GKE)
 Use `google-github-actions/auth` with Workload Identity Federation.
 

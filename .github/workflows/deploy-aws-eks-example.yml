@@ -1,0 +1,39 @@
+name: Deploy to AWS EKS via OIDC
+
+on:
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: Kubernetes manifest path to apply
+        required: false
+        default: examples/namespaces/app-namespaces.yaml
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Build kubeconfig for EKS
+        run: aws eks update-kubeconfig --name "${{ vars.AWS_EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION }}"
+
+      - name: Verify cluster access
+        run: kubectl auth can-i get namespaces
+
+      - name: Apply manifest
+        run: kubectl apply -f "${{ github.event.inputs.manifest }}"

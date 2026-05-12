@@ -1,0 +1,19 @@
+aws_region    = "us-east-1"
+cluster_name  = "secure-dev-eks"
+name_prefix   = "secure-mc"
+github_owner  = "victorbecerragit"
+github_repo   = "secure-multi-cluster-oidc-k8s"
+
+github_subject_type  = "branch"
+github_subject_value = "main"
+
+# Optional managed policy extensions. Keep empty unless the inline CI policy needs temporary augmentation.
+github_actions_managed_policy_arns = []
+
+github_actions_eks_access_policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+github_actions_eks_access_scope_type   = "cluster"
+github_actions_eks_access_namespaces   = []
+node_instance_types                    = ["t3.medium"]
+node_desired_size                      = 2
+node_min_size                          = 1
+node_max_size                          = 3

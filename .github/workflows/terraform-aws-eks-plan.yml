@@ -1,0 +1,44 @@
+name: Terraform AWS EKS Plan
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/terraform-aws-eks-plan.yml"
+      - "infra/terraform/aws/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_WORKING_DIR: infra/terraform/aws/environments/dev
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra/terraform/aws
+
+      - name: Terraform init
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
+
+      - name: Terraform validate
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} validate
+
+      - name: Terraform plan
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} plan -input=false -out=tfplan
