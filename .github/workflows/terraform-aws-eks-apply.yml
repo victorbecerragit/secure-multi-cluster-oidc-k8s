@@ -7,6 +7,19 @@ on:
       - ".github/workflows/terraform-aws-eks-apply.yml"
       - "infra/terraform/aws/**"
   workflow_dispatch:
+    inputs:
+      operation:
+        description: "Terraform operation to run"
+        required: true
+        type: choice
+        options:
+          - apply
+          - destroy
+        default: apply
+      confirm_destroy:
+        description: "Type DESTROY to confirm destroy operation"
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -17,9 +30,14 @@ env:
   TF_WORKING_DIR: infra/terraform/aws/environments/dev
 
 jobs:
-  apply:
+  terraform:
     runs-on: ubuntu-latest
     environment: dev
+    env:
+      TF_VAR_github_owner: ${{ github.repository_owner }}
+      TF_VAR_github_repo: ${{ github.event.repository.name }}
+      TF_VAR_github_subject_type: environment
+      TF_VAR_github_subject_value: dev
     # Skip the entire job until the OIDC role has been bootstrapped locally.
     # Set AWS_GITHUB_OIDC_ROLE_ARN in repository/environment variables to enable.
     if: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN != '' }}
@@ -39,5 +57,17 @@ jobs:
       - name: Terraform init
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
 
+      - name: Validate destroy confirmation
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy != 'DESTROY' }}
+        run: |
+          echo "Destroy requested but confirmation token is invalid."
+          echo "Re-run workflow and set confirm_destroy to exactly: DESTROY"
+          exit 1
+
       - name: Terraform apply
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'apply') }}
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -input=false -auto-approve
+
+      - name: Terraform destroy
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy == 'DESTROY' }}
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} destroy -input=false -auto-approve
