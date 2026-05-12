@@ -22,9 +22,8 @@ module "github_oidc_role" {
 
   create_oidc_provider = true
 
-  # Bootstrap role has no inline or managed policies.
-  # Policies are added in the main EKS stack for specific workloads.
-  managed_policy_arns = []
+  # Bootstrap role must have identity-based permissions to run Terraform from CI.
+  managed_policy_arns = var.managed_policy_arns
   inline_policy_json  = null
 
   tags = var.tags

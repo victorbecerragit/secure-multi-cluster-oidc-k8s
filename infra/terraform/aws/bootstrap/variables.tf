@@ -37,6 +37,12 @@ variable "role_name" {
   default     = "github-actions-oidc-role"
 }
 
+variable "managed_policy_arns" {
+  description = "Managed IAM policy ARNs attached to the bootstrap GitHub Actions role."
+  type        = list(string)
+  default     = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

@@ -14,6 +14,12 @@ github_subject_value = "dev"
 # IAM role name (will be prefixed with account ID for uniqueness)
 role_name = "github-actions-oidc-role"
 
+# Managed policies attached to the bootstrap role used by GitHub Actions.
+# You can replace this with a custom least-privilege policy ARN later.
+managed_policy_arns = [
+  "arn:aws:iam::aws:policy/AdministratorAccess"
+]
+
 # Tags applied to all resources
 tags = {
   Project     = "secure-multi-cluster-oidc-k8s"
