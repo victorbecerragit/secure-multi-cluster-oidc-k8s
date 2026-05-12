@@ -8,8 +8,8 @@ github_owner = "victorbecerragit"
 github_repo  = "secure-multi-cluster-oidc-k8s"
 
 # Trust policy scope: which branch or environment can exchange tokens
-github_subject_type  = "branch"
-github_subject_value = "main"
+github_subject_type = "environment"
+github_subject_value = "dev"
 
 # IAM role name (will be prefixed with account ID for uniqueness)
 role_name = "github-actions-oidc-role"
