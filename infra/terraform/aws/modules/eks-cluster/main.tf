@@ -16,11 +16,11 @@ locals {
 
   # Encryption config with unique KMS alias to prevent AlreadyExistsException
   # Only configure if create_cluster_encryption is true
-  # eks module v20 expects an object, not a list
+  # eks module v20 expects an object or null (not a list)
   cluster_encryption_config = var.create_cluster_encryption ? {
     provider_key_arn = aws_kms_key.eks[0].arn
     resources        = ["secrets"]
-  } : {}
+  } : null
 }
 
 # KMS key for EKS cluster encryption
