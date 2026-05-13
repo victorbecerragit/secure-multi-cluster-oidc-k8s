@@ -25,6 +25,12 @@ variable "node_group_name" {
   default     = "default"
 }
 
+variable "create_node_group" {
+  description = "Whether to create the default managed node group."
+  type        = bool
+  default     = false 
+}
+
 variable "node_instance_types" {
   description = "Instance types for the default managed node group."
   type        = list(string)
@@ -51,6 +57,12 @@ variable "node_max_size" {
 
 variable "cluster_endpoint_public_access" {
   description = "Whether the EKS endpoint is publicly reachable."
+  type        = bool
+  default     = true
+}
+
+variable "cluster_endpoint_private_access" {
+  description = "Whether the EKS endpoint is privately reachable."
   type        = bool
   default     = true
 }

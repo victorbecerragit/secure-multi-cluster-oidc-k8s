@@ -125,3 +125,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cluster_endpoint_public_access_cidrs" {
+  description = "CIDR blocks allowed to reach the EKS public API endpoint"
+  type        = list(string)
+  default     = []
+}
+
+variable "cluster_endpoint_public_access" {
+  description = "Whether the EKS public  API endpoint is enabled"
+  type        = bool
+  default     = true
+}
+
+variable "cluster_endpoint_private_access" {
+  description = "Whether the EKS private API endpoint is enabled"
+  type        = bool
+  default     = true
+}

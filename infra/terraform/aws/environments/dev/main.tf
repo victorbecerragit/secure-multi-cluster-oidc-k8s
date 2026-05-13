@@ -178,8 +178,8 @@ module "vpc" {
   private_subnets = [for index, _ in local.azs : cidrsubnet(var.vpc_cidr, 4, index)]
   public_subnets  = [for index, _ in local.azs : cidrsubnet(var.vpc_cidr, 4, index + 8)]
 
-  enable_nat_gateway = true
-  single_nat_gateway = true
+  enable_nat_gateway = false
+  single_nat_gateway = false
 
   public_subnet_tags = {
     "kubernetes.io/role/elb" = "1"
@@ -219,7 +219,9 @@ module "eks_cluster" {
   node_desired_size              = var.node_desired_size
   node_min_size                  = var.node_min_size
   node_max_size                  = var.node_max_size
-  cluster_endpoint_public_access = true
+
+  cluster_endpoint_public_access       = var.cluster_endpoint_public_access
+  cluster_endpoint_private_access      = var.cluster_endpoint_private_access
 
   access_entries = {
     github_actions = {

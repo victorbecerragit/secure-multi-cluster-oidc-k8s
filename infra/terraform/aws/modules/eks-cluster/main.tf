@@ -19,16 +19,17 @@ module "eks" {
   vpc_id                                   = var.vpc_id
   subnet_ids                               = var.subnet_ids
   cluster_endpoint_public_access           = var.cluster_endpoint_public_access
+  cluster_endpoint_private_access          = var.cluster_endpoint_private_access
   enable_cluster_creator_admin_permissions = false
 
-  eks_managed_node_groups = {
+  eks_managed_node_groups = var.create_node_group ? {
     (var.node_group_name) = {
       instance_types = var.node_instance_types
       desired_size   = var.node_desired_size
       min_size       = var.node_min_size
       max_size       = var.node_max_size
     }
-  }
+  } : {}
 
   tags = var.tags
 }

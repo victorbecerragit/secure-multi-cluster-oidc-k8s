@@ -47,6 +47,15 @@
         "iam:UntagPolicy"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "TerraformPlanReadEc2",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeRegions"
+      ],
+      "Resource": "*"
     }
   ]
 }
