@@ -14,13 +14,14 @@ locals {
     if value.access_scope_type == "namespace"
   }
 
-  # Default encryption config with unique KMS alias to prevent AlreadyExistsException
-  default_cluster_encryption_config = [
+  # Encryption config with unique KMS alias to prevent AlreadyExistsException
+  # Only configure if create_cluster_encryption is true
+  cluster_encryption_config = var.create_cluster_encryption ? [
     {
-      provider_key_arn = var.create_cluster_encryption ? aws_kms_key.eks[0].arn : null
-      resources        = var.create_cluster_encryption ? ["secrets"] : []
+      provider_key_arn = aws_kms_key.eks[0].arn
+      resources        = ["secrets"]
     }
-  ]
+  ] : []
 }
 
 # KMS key for EKS cluster encryption
@@ -58,7 +59,7 @@ module "eks" {
   cluster_endpoint_public_access           = var.cluster_endpoint_public_access
   cluster_endpoint_private_access          = var.cluster_endpoint_private_access
   enable_cluster_creator_admin_permissions = false
-  cluster_encryption_config                = var.create_cluster_encryption ? local.default_cluster_encryption_config : []
+  cluster_encryption_config                = local.cluster_encryption_config
 
   eks_managed_node_groups = var.create_node_group ? {
     (var.node_group_name) = {
