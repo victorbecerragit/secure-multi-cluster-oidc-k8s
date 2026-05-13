@@ -58,7 +58,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform init
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init -lock=false
 
       - name: Validate destroy confirmation
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy != 'DESTROY' }}
@@ -69,8 +69,8 @@ jobs:
 
       - name: Terraform apply
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'apply') }}
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -input=false -auto-approve
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -lock=false -input=false -auto-approve
 
       - name: Terraform destroy
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy == 'DESTROY' }}
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} destroy -input=false -auto-approve
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} destroy -lock=false -input=false -auto-approve
