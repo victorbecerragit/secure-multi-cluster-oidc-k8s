@@ -79,6 +79,12 @@ variable "access_entries" {
   default = {}
 }
 
+variable "create_cluster_encryption" {
+  description = "Whether to create a KMS key for EKS cluster encryption."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags applied to the cluster and related resources."
   type        = map(string)

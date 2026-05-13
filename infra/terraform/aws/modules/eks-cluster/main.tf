@@ -1,3 +1,8 @@
+# Generate unique suffix for KMS alias to avoid conflicts on repeated applies
+resource "random_id" "kms_alias_suffix" {
+  byte_length = 4
+}
+
 locals {
   cluster_scope_access_entries = {
     for key, value in var.access_entries : key => value
@@ -8,6 +13,38 @@ locals {
     for key, value in var.access_entries : key => value
     if value.access_scope_type == "namespace"
   }
+
+  # Default encryption config with unique KMS alias to prevent AlreadyExistsException
+  default_cluster_encryption_config = [
+    {
+      provider_key_arn = var.create_cluster_encryption ? aws_kms_key.eks[0].arn : null
+      resources        = var.create_cluster_encryption ? ["secrets"] : []
+    }
+  ]
+}
+
+# KMS key for EKS cluster encryption
+resource "aws_kms_key" "eks" {
+  count = var.create_cluster_encryption ? 1 : 0
+
+  description             = "KMS key for ${var.cluster_name} EKS cluster encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.cluster_name}-eks-key"
+    }
+  )
+}
+
+# Unique KMS alias with random suffix
+resource "aws_kms_alias" "eks" {
+  count = var.create_cluster_encryption ? 1 : 0
+
+  name          = "alias/eks/${var.cluster_name}-${random_id.kms_alias_suffix.hex}"
+  target_key_id = aws_kms_key.eks[0].key_id
 }
 
 module "eks" {
@@ -21,6 +58,7 @@ module "eks" {
   cluster_endpoint_public_access           = var.cluster_endpoint_public_access
   cluster_endpoint_private_access          = var.cluster_endpoint_private_access
   enable_cluster_creator_admin_permissions = false
+  cluster_encryption_config                = var.create_cluster_encryption ? local.default_cluster_encryption_config : []
 
   eks_managed_node_groups = var.create_node_group ? {
     (var.node_group_name) = {
