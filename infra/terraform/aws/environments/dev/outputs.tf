@@ -27,3 +27,13 @@ output "github_subject" {
   description = "Exact GitHub subject claim allowed to assume the CI role."
   value       = module.github_oidc_role.github_subject
 }
+
+output "github_deploy_role_arn" {
+  description = "IAM role ARN assumed by GitHub Actions for EKS deployment (kubectl apply only). Maps to the github:ci-deployers Kubernetes group."
+  value       = module.github_oidc_role_deploy.role_arn
+}
+
+output "github_deploy_subject" {
+  description = "Exact GitHub subject claim allowed to assume the deploy role."
+  value       = module.github_oidc_role_deploy.github_subject
+}

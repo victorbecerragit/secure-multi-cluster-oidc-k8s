@@ -1,0 +1,131 @@
+name: EKS Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/eks-deploy.yml"
+      - "deploy/eks/github-oidc/**"
+      - "policies/network/**"
+      - "infra/terraform/aws/bootstrap/k8s-namespaces/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    # Dedicated deploy role. Keep separate from Terraform role.
+    if: ${{ vars.AWS_GITHUB_DEPLOY_ROLE_ARN != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via GitHub OIDC (deploy role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Build kubeconfig for EKS
+        run: aws eks update-kubeconfig --name "${{ vars.AWS_EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION }}"
+
+      - name: Preflight validation (reachability + guardrails)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expect_yes() {
+            local check="$1"
+            local result
+            result="$(eval "$check")"
+            echo "CHECK (expect yes): $check => $result"
+            [ "$result" = "yes" ] || { echo "Authorization check failed (expected yes)."; exit 1; }
+          }
+
+          expect_no() {
+            local check="$1"
+            local result
+            result="$(eval "$check")"
+            echo "CHECK (expect no): $check => $result"
+            [ "$result" = "no" ] || { echo "Authorization check failed (expected no)."; exit 1; }
+          }
+
+          # API server reachability check before any applies.
+          kubectl get --raw='/version' > /dev/null
+
+          # Low-risk positive check: confirms authenticated cluster visibility.
+          expect_yes "kubectl auth can-i get namespaces"
+
+          # Guardrails must hold before any resource apply.
+          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i get secrets -n app-prod"
+          expect_no "kubectl auth can-i get secrets -n app-staging"
+
+      - name: Validate namespaces exist (created by bootstrap)
+        run: |
+          set -euo pipefail
+          # Namespaces are cluster-wide infrastructure managed by bootstrap/Terraform.
+          # Deploy CI validates they exist rather than creating them.
+          kubectl get namespace app-prod > /dev/null || { echo "Namespace app-prod not found. Bootstrap must create it first."; exit 1; }
+          kubectl get namespace app-staging > /dev/null || { echo "Namespace app-staging not found. Bootstrap must create it first."; exit 1; }
+
+      - name: Apply namespace-scoped RBAC
+        run: |
+          set -euo pipefail
+          # Namespace-scoped RBAC only. ClusterRole is bootstrap/platform-managed.
+          kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-prod.yaml
+          kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-staging.yaml
+
+      - name: Post-RBAC authorization validation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expect_yes() {
+            local check="$1"
+            local result
+            result="$(eval "$check")"
+            echo "CHECK (expect yes): $check => $result"
+            [ "$result" = "yes" ] || { echo "Authorization check failed (expected yes)."; exit 1; }
+          }
+
+          expect_no() {
+            local check="$1"
+            local result
+            result="$(eval "$check")"
+            echo "CHECK (expect no): $check => $result"
+            [ "$result" = "no" ] || { echo "Authorization check failed (expected no)."; exit 1; }
+          }
+
+          # Positive checks run only after namespace RoleBindings are in place.
+          expect_yes "kubectl auth can-i create deployments.apps -n app-prod"
+          expect_yes "kubectl auth can-i patch deployments.apps -n app-prod"
+          expect_yes "kubectl auth can-i create deployments.apps -n app-staging"
+          expect_yes "kubectl auth can-i patch deployments.apps -n app-staging"
+          expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-prod"
+          expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-staging"
+
+          # Guardrails must remain denied after applies.
+          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i get secrets -n app-prod"
+          expect_no "kubectl auth can-i get secrets -n app-staging"
+
+      - name: Apply network policies (additive allow-list)
+        run: |
+          set -euo pipefail
+          # NetworkPolicies are additive (union semantics): traffic allowed by *any*
+          # matching policy is permitted. Apply baseline allows first, then restrictive
+          # policies, for predictable rollout ordering.
+          kubectl apply -f policies/network/baseline-allow.yaml
+          kubectl apply -n app-prod -f policies/network/default-deny.yaml
+          kubectl apply -n app-staging -f policies/network/default-deny.yaml

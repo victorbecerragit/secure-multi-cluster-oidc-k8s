@@ -68,12 +68,12 @@ variable "cluster_endpoint_private_access" {
 }
 
 variable "access_entries" {
-  description = "IAM principals that should receive EKS access entries and policy associations."
+  description = "IAM principals that should receive EKS access entries and policy associations. Set policy_arn to null for group-only entries whose permissions are managed entirely by Kubernetes RBAC."
   type = map(object({
     principal_arn     = string
     kubernetes_groups = optional(list(string), [])
-    policy_arn        = string
-    access_scope_type = string
+    policy_arn        = optional(string, null)
+    access_scope_type = optional(string, "none")
     namespaces        = optional(list(string), [])
   }))
   default = {}

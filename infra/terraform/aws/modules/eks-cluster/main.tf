@@ -6,12 +6,12 @@ resource "random_id" "kms_alias_suffix" {
 locals {
   cluster_scope_access_entries = {
     for key, value in var.access_entries : key => value
-    if value.access_scope_type == "cluster"
+    if value.access_scope_type == "cluster" && value.policy_arn != null
   }
 
   namespace_scope_access_entries = {
     for key, value in var.access_entries : key => value
-    if value.access_scope_type == "namespace"
+    if value.access_scope_type == "namespace" && value.policy_arn != null
   }
 
   # Encryption config with unique KMS alias to prevent AlreadyExistsException

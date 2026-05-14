@@ -208,6 +208,33 @@ module "github_oidc_role" {
   tags                       = local.common_tags
 }
 
+# Security intent: the deploy role only needs DescribeCluster to build a kubeconfig.
+# All kubectl permissions are controlled by Kubernetes RBAC via the github:ci-deployers group.
+data "aws_iam_policy_document" "github_actions_deploy" {
+  statement {
+    sid       = "EksDescribeOnly"
+    actions   = ["eks:DescribeCluster"]
+    resources = ["arn:${data.aws_partition.current.partition}:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.cluster_name}"]
+  }
+}
+
+# Separate GitHub OIDC role for Kubernetes deployment only.
+# This role CANNOT modify infrastructure – it is scoped purely to kubectl apply operations
+# through Kubernetes RBAC, keeping infra provisioning and app deployment as separate identities.
+module "github_oidc_role_deploy" {
+  source = "../../modules/github-oidc-role"
+
+  role_name                  = "${var.name_prefix}-gha-eks-deploy"
+  github_owner               = var.github_owner
+  github_repo                = var.github_repo
+  subject_type               = var.github_subject_type
+  subject_value              = var.github_deploy_subject_value
+  create_oidc_provider       = false
+  existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
+  inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
+  tags                       = local.common_tags
+}
+
 module "eks_cluster" {
   source = "../../modules/eks-cluster"
 
@@ -224,12 +251,18 @@ module "eks_cluster" {
   cluster_endpoint_private_access      = var.cluster_endpoint_private_access
 
   access_entries = {
-    github_actions = {
+    # Infra role: full cluster admin for Terraform-managed provisioning
+    github_actions_terraform = {
       principal_arn     = module.github_oidc_role.role_arn
       kubernetes_groups = ["github:terraform-admins"]
       policy_arn        = var.github_actions_eks_access_policy_arn
       access_scope_type = var.github_actions_eks_access_scope_type
       namespaces        = var.github_actions_eks_access_namespaces
+    }
+    # Deploy role: group-only entry; permissions are managed by Kubernetes RBAC (ClusterRole/RoleBinding)
+    github_actions_deploy = {
+      principal_arn     = module.github_oidc_role_deploy.role_arn
+      kubernetes_groups = ["github:ci-deployers"]
     }
   }
 

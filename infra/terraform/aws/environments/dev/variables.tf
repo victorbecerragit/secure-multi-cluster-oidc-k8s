@@ -143,3 +143,13 @@ variable "cluster_endpoint_private_access" {
   type        = bool
   default     = true
 }
+
+# ---------------------------------------------------------------------------
+# Deploy role – separate GitHub Actions identity for kubectl apply operations
+# ---------------------------------------------------------------------------
+
+variable "github_deploy_subject_value" {
+  description = "Branch name or environment name that the deploy OIDC role trusts. Defaults to 'main'. For production use, prefer an environment name (e.g. 'eks-deploy') to restrict access to jobs running in a named GitHub environment with required reviewers."
+  type        = string
+  default     = "main"
+}

@@ -1,0 +1,81 @@
+# ClusterRole for the GitHub Actions deploy persona (github:ci-deployers group).
+#
+# Platform-managed bootstrap resource.
+# This cluster-scoped role is intentionally not applied by deploy workflows.
+#
+# Intentionally narrower than the built-in "edit" ClusterRole:
+#   - No Secrets access (prevents credential harvesting from CI)
+#   - No ServiceAccount mutations (prevents privilege escalation)
+#   - No RBAC mutations (no roles/bindings write)
+#
+# Applied per-namespace via RoleBinding (namespace-scoped), not cluster-wide.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: github-ci-deployer
+  labels:
+    app.kubernetes.io/managed-by: kubectl
+    rbac.example.com/persona: github-ci-deployers
+rules:
+  # Core workload resources
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Rollout management
+  - apiGroups: ["apps"]
+    resources:
+      - deployments/rollback
+      - deployments/scale
+      - statefulsets/scale
+    verbs: ["create", "update", "patch"]
+
+  # Core API resources (safe subset — no secrets, no serviceaccounts)
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/status
+    verbs: ["get", "list", "watch"]
+
+  - apiGroups: [""]
+    resources:
+      - services
+      - endpoints
+      - configmaps
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: [""]
+    resources:
+      - events
+    verbs: ["get", "list", "watch"]
+
+  # Autoscaling
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Disruption budgets (needed for safe rolling deploys)
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Networking
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Batch jobs (for migration/init jobs in CI pipelines)
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

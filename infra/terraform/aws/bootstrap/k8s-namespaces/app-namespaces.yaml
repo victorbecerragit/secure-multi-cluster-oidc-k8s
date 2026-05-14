@@ -1,0 +1,28 @@
+# Platform-managed namespaces for application workloads.
+# These are cluster-wide infrastructure resources created during bootstrap/Terraform apply.
+# Deploy CI validates namespace existence but does not create or modify them.
+#
+# Rationale:
+# - Namespaces are cluster-scoped infrastructure, not workload resources
+# - Ownership separation: bootstrap/Terraform owns cluster setup; deploy CI owns workload deployment
+# - This enforces least privilege: deploy role is scoped to namespace-level operations only
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-prod
+  labels:
+    env: production
+    security: high
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-staging
+  labels:
+    env: staging
+    security: standard
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted

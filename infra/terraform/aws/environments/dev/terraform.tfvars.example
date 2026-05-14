@@ -13,10 +13,20 @@ github_actions_managed_policy_arns = []
 github_actions_eks_access_policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 github_actions_eks_access_scope_type   = "cluster"
 github_actions_eks_access_namespaces   = []
-node_instance_types                    = ["t3.medium"]
-node_desired_size                      = 2
-node_min_size                          = 1
-node_max_size                          = 3
+
+# ---------------------------------------------------------------------------
+# Deploy role – separate identity for kubectl apply (no infra permissions)
+# ---------------------------------------------------------------------------
+# The subject value must match the branch or GitHub environment name used in
+# the deployment workflow. Using a named environment (e.g. "eks-deploy")
+# is recommended for production so that required-reviewer protection applies.
+github_deploy_subject_value = "main"
+# github_deploy_subject_value = "eks-deploy"   # switch to a named environment in production
+
+node_instance_types = ["t3.medium"]
+node_desired_size   = 2
+node_min_size       = 1
+node_max_size       = 3
 
 # Use this only for temporary dev access from public GitHub-hosted runners.
 cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"]
