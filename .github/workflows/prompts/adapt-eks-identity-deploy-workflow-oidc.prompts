@@ -1,0 +1,140 @@
+Read this repository carefully and implement the next milestone: integrate GitHub Actions with the AWS EKS cluster to deploy the same core Kubernetes resources that are already used in the local kind setup.
+
+Repository context:
+- Local lab resources already exist in:
+  - examples/
+  - rbac/
+  - policies/
+  - scripts/
+- AWS EKS Terraform already exists in:
+  - infra/terraform/aws/environments/dev/
+  - infra/terraform/aws/modules/eks-cluster/
+  - infra/terraform/aws/modules/github-oidc-role/
+  - infra/terraform/aws/bootstrap/
+- Docs already exist in:
+  - docs/access-model.md
+  - docs/aws-eks-github-oidc.md
+  - docs/eks-vs-kind-auth.md
+- There is already a GitHub OIDC role used for Terraform/EKS provisioning.
+- The local kind setup uses Keycloak OIDC groups and Kubernetes RBAC.
+- For EKS, authentication must be:
+  GitHub OIDC -> AWS IAM role -> EKS access entry -> Kubernetes RBAC
+
+Goal:
+Implement a dedicated EKS deployment path for GitHub Actions that reuses the local namespace, RBAC, and policy model where appropriate, but does NOT reuse the Terraform admin role for application/platform deployment.
+
+Important architecture decision:
+- Keep infrastructure provisioning and Kubernetes deployment as separate identities.
+- Add a deploy-only GitHub OIDC role for EKS.
+- Add a separate EKS access entry for the deploy role.
+- Reuse/adapt the local RBAC and policy manifests for EKS deployment.
+- Keep the solution simple, secure, and interview-ready.
+
+Implementation requirements:
+
+1. Terraform changes
+- In infra/terraform/aws/environments/dev/ and modules/, add support for a second GitHub OIDC IAM role dedicated to deployment.
+- Keep the existing Terraform/provisioning role intact.
+- Add a new EKS access entry for the deploy role.
+- Map the deploy role to a Kubernetes group representing the CI deploy persona.
+- Prefer a clear name like:
+  - gha-terraform for infra
+  - gha-eks-deploy for Kubernetes deploy
+- Keep least privilege in mind.
+
+2. Kubernetes RBAC changes
+- Reuse the existing RBAC model from:
+  - rbac/manager/bindings/
+  - rbac/workload/bindings/
+  - rbac/roles/platform-admin.yaml
+- Create an EKS-friendly RBAC layer that binds the deploy identity/group to namespace-scoped permissions.
+- Do not assume Keycloak groups are available in EKS.
+- For EKS, use a Kubernetes group like:
+  - github:ci-deployers
+  or another clearly named GitHub-specific group.
+- Preserve the original local Keycloak RBAC files.
+- Add EKS-specific RBAC/manifests in a clean location rather than mutating the local lab structure destructively.
+
+3. Deployment manifest structure
+- Reuse:
+  - examples/namespaces/app-namespaces.yaml
+  - policies/network/default-deny.yaml
+  - policies/network/baseline-allow.yaml
+- Create a clear EKS apply path for:
+  - namespaces
+  - network policies
+  - RBAC
+- Keep ordering explicit.
+- If needed, create a new folder like:
+  - deploy/eks/base/
+  or
+  - examples/eks/
+- Keep the local kind files intact and reusable.
+
+4. GitHub Actions workflow
+- Add a new workflow dedicated to EKS deployment.
+- Do not reuse the Terraform workflow for deployment.
+- The workflow should:
+  - checkout the repo
+  - assume the new deploy role via aws-actions/configure-aws-credentials
+  - build kubeconfig for the EKS cluster
+  - verify access with kubectl auth can-i
+  - apply namespaces, RBAC, and network policies in a safe order
+- Keep the workflow simple and understandable.
+- Use repository/environment variables for:
+  - AWS region
+  - EKS cluster name
+  - deploy role ARN
+- Add clear failure messages.
+
+5. Documentation updates
+- Update docs/aws-eks-github-oidc.md
+- Add a short doc or README section explaining:
+  - difference between local Keycloak auth and EKS GitHub OIDC auth
+  - why there are two GitHub IAM roles
+  - how the EKS deploy workflow works
+  - what Kubernetes group is used for deploys
+- Update the root README with a brief EKS deploy flow section.
+
+Constraints:
+- Do not overengineer.
+- Do not introduce Argo CD, Flux, or Helm-based deployment in this milestone.
+- Do not port Keycloak itself to EKS.
+- Do not remove the local kind lab.
+- Keep the solution focused on namespaces, RBAC, and network policy deployment.
+- Favor readability and explicit security intent over clever abstraction.
+
+Expected file changes:
+- infra/terraform/aws/environments/dev/main.tf
+- infra/terraform/aws/environments/dev/variables.tf
+- infra/terraform/aws/environments/dev/outputs.tf
+- infra/terraform/aws/modules/github-oidc-role/*
+- infra/terraform/aws/modules/eks-cluster/* if needed
+- new EKS-specific RBAC/manifests folder
+- new GitHub workflow file
+- docs/aws-eks-github-oidc.md
+- README.md
+
+Suggested implementation phases:
+
+Phase 1:
+Review the current repo and propose the exact files to add/change, plus the target architecture.
+
+Phase 2:
+Implement Terraform for the deploy-only GitHub OIDC role and EKS access entry.
+
+Phase 3:
+Implement EKS-specific RBAC/manifests for deploy persona, reusing the local model where sensible.
+
+Phase 4:
+Add the GitHub Actions deploy workflow for EKS.
+
+Phase 5:
+Update docs and README.
+
+Before editing files:
+- Show the implementation plan
+- Show the proposed file tree
+- Explain the identity flow for both roles:
+  - gha-terraform
+  - gha-eks-deploy
