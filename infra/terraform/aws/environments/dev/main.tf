@@ -227,8 +227,8 @@ module "github_oidc_role_deploy" {
   role_name                  = "${var.name_prefix}-gha-eks-deploy"
   github_owner               = var.github_owner
   github_repo                = var.github_repo
-  subject_type               = var.github_subject_type
-  subject_value              = var.github_deploy_subject_value
+  subject_type               = "environment"
+  subject_value              = "*"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
@@ -243,8 +243,8 @@ module "github_oidc_role_build" {
   role_name                  = "${var.name_prefix}-gha-ecr-build"
   github_owner               = var.github_owner
   github_repo                = var.github_repo
-  subject_type               = var.github_subject_type
-  subject_value              = var.github_deploy_subject_value
+  subject_type               = "branch"
+  subject_value              = "*"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   managed_policy_arns        = ["arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"]
@@ -284,4 +284,3 @@ module "eks_cluster" {
 
   tags = local.common_tags
 }
-

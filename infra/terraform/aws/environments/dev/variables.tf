@@ -160,7 +160,7 @@ variable "github_deploy_subject_value" {
 # ---------------------------------------------------------------------------
 
 variable "github_build_subject_value" {
-  description = "Branch name or environment name that the deploy OIDC role trusts. Defaults to 'main'. For production use, prefer an environment name (e.g. 'eks-deploy') to restrict access to jobs running in a named GitHub environment with required reviewers."
+  description = "Branch name that the build OIDC role trusts. Defaults to 'main'. Using '*' allows the build job to run on any branch (e.g. main and develop)."
   type        = string
   default     = "main"
 }
