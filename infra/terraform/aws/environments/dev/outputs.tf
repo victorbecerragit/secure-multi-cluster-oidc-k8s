@@ -40,5 +40,5 @@ output "github_deploy_subject" {
 
 output "github_build_role_arn" {
   description = "ECR build role ARN."
-  value       = aws_iam_role.github_build.arn
+  value       = module.github_oidc_role_build.role_arn
 }

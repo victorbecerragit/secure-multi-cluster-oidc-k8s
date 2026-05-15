@@ -235,6 +235,22 @@ module "github_oidc_role_deploy" {
   tags                       = local.common_tags
 }
 
+# Separate GitHub OIDC role for ECR build and push operations.
+# Scoped specifically for container image management in CI/CD workflows.
+module "github_oidc_role_build" {
+  source = "../../modules/github-oidc-role"
+
+  role_name                  = "${var.name_prefix}-gha-ecr-build"
+  github_owner               = var.github_owner
+  github_repo                = var.github_repo
+  subject_type               = var.github_subject_type
+  subject_value              = "*"
+  create_oidc_provider       = false
+  existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
+  managed_policy_arns        = ["arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryPushPullPolicy"]
+  tags                       = local.common_tags
+}
+
 module "eks_cluster" {
   source = "../../modules/eks-cluster"
 
@@ -269,31 +285,3 @@ module "eks_cluster" {
   tags = local.common_tags
 }
 
-# ECR Build Role (GitHub OIDC)
-resource "aws_iam_role" "github_build" {
-  name = "secure-mc-gha-ecr-build"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = aws_iam_openid_connect_provider.github[0].arn
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-            "token.actions.githubusercontent.com:sub" = "repo:victorbecerragit/secure-multi-cluster-oidc-k8s:*"
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "github_build_ecr" {
-  role       = aws_iam_role.github_build.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPushPullPolicy"
-}
