@@ -73,7 +73,7 @@ jobs:
 
       - name: Terraform plan
         if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'plan') }}
-        run: terraform -chdir=${{ env.TF_WORKING_DIR }} plan -input=false
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} plan -lock=false -input=false
 
       - name: Validate destroy confirmation
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy != 'DESTROY' }}
