@@ -247,7 +247,7 @@ module "github_oidc_role_build" {
   subject_value              = "*"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
-  managed_policy_arns        = ["arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryPushPullPolicy"]
+  managed_policy_arns        = ["arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"]
   tags                       = local.common_tags
 }
 
