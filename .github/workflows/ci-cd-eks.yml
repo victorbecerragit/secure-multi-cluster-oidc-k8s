@@ -41,10 +41,11 @@ jobs:
       # OIDC Authentication: Exchange GitHub token for AWS credentials (build role)
       # Role must have minimal permissions: ECR repository creation + push
       # -----------------------------------------------------------------------
-      - name: Configure AWS Credentials via GitHub OIDC (build role)
+      - name: Configure AWS Credentials via GitHub OIDC (build role in prod)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_GITHUB_BUILD_ROLE_ARN }}
+          #role-to-assume: ${{ vars.AWS_GITHUB_BUILD_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
