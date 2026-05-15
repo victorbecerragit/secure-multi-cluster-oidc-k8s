@@ -37,3 +37,8 @@ output "github_deploy_subject" {
   description = "Exact GitHub subject claim allowed to assume the deploy role."
   value       = module.github_oidc_role_deploy.github_subject
 }
+
+output "github_build_role_arn" {
+  description = "ECR build role ARN."
+  value       = aws_iam_role.github_build.arn
+}

@@ -238,17 +238,17 @@ module "github_oidc_role_deploy" {
 module "eks_cluster" {
   source = "../../modules/eks-cluster"
 
-  cluster_name                   = var.cluster_name
-  kubernetes_version             = var.kubernetes_version
-  vpc_id                         = module.vpc.vpc_id
-  subnet_ids                     = module.vpc.private_subnets
-  node_instance_types            = var.node_instance_types
-  node_desired_size              = var.node_desired_size
-  node_min_size                  = var.node_min_size
-  node_max_size                  = var.node_max_size
+  cluster_name        = var.cluster_name
+  kubernetes_version  = var.kubernetes_version
+  vpc_id              = module.vpc.vpc_id
+  subnet_ids          = module.vpc.private_subnets
+  node_instance_types = var.node_instance_types
+  node_desired_size   = var.node_desired_size
+  node_min_size       = var.node_min_size
+  node_max_size       = var.node_max_size
 
-  cluster_endpoint_public_access       = var.cluster_endpoint_public_access
-  cluster_endpoint_private_access      = var.cluster_endpoint_private_access
+  cluster_endpoint_public_access  = var.cluster_endpoint_public_access
+  cluster_endpoint_private_access = var.cluster_endpoint_private_access
 
   access_entries = {
     # Infra role: full cluster admin for Terraform-managed provisioning
@@ -267,4 +267,33 @@ module "eks_cluster" {
   }
 
   tags = local.common_tags
+}
+
+# ECR Build Role (GitHub OIDC)
+resource "aws_iam_role" "github_build" {
+  name = "secure-mc-gha-ecr-build"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github[0].arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+            "token.actions.githubusercontent.com:sub" = "repo:victorbecerragit/secure-multi-cluster-oidc-k8s:*"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_build_ecr" {
+  role       = aws_iam_role.github_build.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPushPullPolicy"
 }
