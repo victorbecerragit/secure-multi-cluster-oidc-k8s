@@ -46,7 +46,7 @@ jobs:
           echo "repository=${GITHUB_REPOSITORY}"        
           echo "repository_owner=${GITHUB_REPOSITORY_OWNER}"
           echo "repository_id=${GITHUB_REPOSITORY_ID}"
-          
+
       # -----------------------------------------------------------------------
       # OIDC Authentication: Exchange GitHub token for AWS credentials (build role)
       # Role must have minimal permissions: ECR repository creation + push
@@ -82,6 +82,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cd app
           docker build -t "${{ steps.meta.outputs.image_uri }}" .
           docker push "${{ steps.meta.outputs.image_uri }}"
           echo "Image pushed: ${{ steps.meta.outputs.image_uri }}"
@@ -167,7 +168,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          helm lint charts/myapp
+          helm lint helm/charts/myapp
           echo "Helm chart passed lint."
 
       - name: Determine deployment target
@@ -178,7 +179,7 @@ jobs:
           HELM_VALUES_FILE=""
           if [[ "${{ github.ref_name }}" == "main" ]]; then
             TARGET_NAMESPACE="app-prod"
-            HELM_VALUES_FILE="charts/myapp/values-prod.yaml"
+            HELM_VALUES_FILE="helm/charts/myapp/values-prod.yaml"
             echo "Deploying to app-prod namespace (main branch)..."
           else
             TARGET_NAMESPACE="app-staging"
@@ -197,7 +198,7 @@ jobs:
         run: |
           set -euo pipefail
           
-          helm upgrade --install "${HELM_RELEASE}" charts/myapp \
+          helm upgrade --install "${HELM_RELEASE}" helm/charts/myapp \
             --namespace "${{ steps.set_target.outputs.TARGET_NAMESPACE }}" \
             --values "${{ steps.set_target.outputs.HELM_VALUES_FILE }}" \
             --set image.repository="${{ needs.build.outputs.image_uri }}" \
