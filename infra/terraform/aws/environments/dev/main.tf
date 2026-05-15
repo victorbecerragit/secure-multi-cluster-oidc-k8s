@@ -228,7 +228,7 @@ module "github_oidc_role_deploy" {
   github_owner               = var.github_owner
   github_repo                = var.github_repo
   subject_type               = "environment"
-  subject_value              = "*"
+  subject_value              = "['prod','staging']"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
