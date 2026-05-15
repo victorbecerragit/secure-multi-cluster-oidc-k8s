@@ -221,14 +221,31 @@ data "aws_iam_policy_document" "github_actions_deploy" {
 # Separate GitHub OIDC role for Kubernetes deployment only.
 # This role CANNOT modify infrastructure – it is scoped purely to kubectl apply operations
 # through Kubernetes RBAC, keeping infra provisioning and app deployment as separate identities.
-module "github_oidc_role_deploy" {
+module "github_oidc_role_deploy_prod" {
   source = "../../modules/github-oidc-role"
 
-  role_name                  = "${var.name_prefix}-gha-eks-deploy"
+  role_name                  = "${var.name_prefix}-gha-eks-deploy-prod"
   github_owner               = var.github_owner
   github_repo                = var.github_repo
   subject_type               = "environment"
-  subject_value              = "['prod','staging']"
+  subject_value              = "prod"
+  create_oidc_provider       = false
+  existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
+  inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
+  tags                       = local.common_tags
+}
+
+# Separate GitHub OIDC role for Kubernetes deployment only.
+# This role CANNOT modify infrastructure – it is scoped purely to kubectl apply operations
+# through Kubernetes RBAC, keeping infra provisioning and app deployment as separate identities.
+module "github_oidc_role_deploy_staging" {
+  source = "../../modules/github-oidc-role"
+
+  role_name                  = "${var.name_prefix}-gha-eks-deploy-staging"
+  github_owner               = var.github_owner
+  github_repo                = var.github_repo
+  subject_type               = "environment"
+  subject_value              = "staging"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
@@ -277,7 +294,7 @@ module "eks_cluster" {
     }
     # Deploy role: group-only entry; permissions are managed by Kubernetes RBAC (ClusterRole/RoleBinding)
     github_actions_deploy = {
-      principal_arn     = module.github_oidc_role_deploy.role_arn
+      principal_arn = module.github_oidc_role_deploy_prod.role_arn 
       kubernetes_groups = ["github:ci-deployers"]
     }
   }

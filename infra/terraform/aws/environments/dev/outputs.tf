@@ -28,14 +28,15 @@ output "github_subject" {
   value       = module.github_oidc_role.github_subject
 }
 
-output "github_deploy_role_arn" {
-  description = "IAM role ARN assumed by GitHub Actions for EKS deployment (kubectl apply only). Maps to the github:ci-deployers Kubernetes group."
-  value       = module.github_oidc_role_deploy.role_arn
+output "github_deploy_prod_subject" {
+  description = "Exact GitHub subject claim allowed to assume the deploy role."
+  value       = module.github_oidc_role_deploy_prod.github_subject
 }
 
-output "github_deploy_subject" {
+
+output "github_deploy_staging_subject" {
   description = "Exact GitHub subject claim allowed to assume the deploy role."
-  value       = module.github_oidc_role_deploy.github_subject
+  value       = module.github_oidc_role_deploy_staging.github_subject
 }
 
 output "github_build_role_arn" {
