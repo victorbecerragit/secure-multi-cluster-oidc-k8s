@@ -244,7 +244,7 @@ module "github_oidc_role_build" {
   github_owner               = var.github_owner
   github_repo                = var.github_repo
   subject_type               = "branch"
-  subject_value              = "*"
+  subject_value              = "develop"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   managed_policy_arns        = ["arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"]
