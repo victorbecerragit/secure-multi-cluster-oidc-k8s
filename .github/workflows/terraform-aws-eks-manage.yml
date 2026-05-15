@@ -1,0 +1,91 @@
+name: Terraform AWS EKS Management
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/terraform-aws-eks-manage.yml"
+      - "infra/terraform/aws/**"
+  pull_request:
+    paths:
+      - ".github/workflows/terraform-aws-eks-manage.yml"
+      - "infra/terraform/aws/**"
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Terraform operation to run"
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: plan
+      confirm_destroy:
+        description: "Type DESTROY to confirm destroy operation"
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_WORKING_DIR: infra/terraform/aws/environments/dev
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      TF_VAR_github_owner: ${{ github.repository_owner }}
+      TF_VAR_github_repo: ${{ github.event.repository.name }}
+      TF_VAR_github_subject_type: environment
+      TF_VAR_github_subject_value: dev
+      # Bootstrap already created the GitHub OIDC provider; skip re-creation to avoid 409.
+      TF_VAR_create_github_oidc_provider: "false"
+      TF_VAR_existing_github_oidc_provider_arn: "arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:oidc-provider/token.actions.githubusercontent.com"
+    # Skip the entire job until the OIDC role has been bootstrapped locally.
+    # Set AWS_GITHUB_OIDC_ROLE_ARN in repository/environment variables to enable.
+    if: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} init -lock=false
+
+      - name: Terraform validate
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} validate
+
+      - name: Terraform plan
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'plan') }}
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} plan -input=false
+
+      - name: Validate destroy confirmation
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy != 'DESTROY' }}
+        run: |
+          echo "Destroy requested but confirmation token is invalid."
+          echo "Re-run workflow and set confirm_destroy to exactly: DESTROY"
+          exit 1
+
+      - name: Terraform apply
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'apply') }}
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -lock=false -input=false -auto-approve
+
+      - name: Terraform destroy
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy == 'DESTROY' }}
+        run: terraform -chdir=${{ env.TF_WORKING_DIR }} destroy -lock=false -input=false -auto-approve

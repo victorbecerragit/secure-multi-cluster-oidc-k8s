@@ -1,0 +1,60 @@
+name: Multi-Cluster Federation Demo
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'examples/**'
+      - 'helm/**'
+      - '.github/workflows/multi-cluster-federation-demo.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # MANAGER CLUSTER JOB
+  # Simulates central management of policies and namespaces
+  # ---------------------------------------------------------------------------
+  manager-deploy:
+    name: "Demo: Manager Cluster (Control Plane)"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Simulate Central Policy Deployment
+        run: |
+          echo "--- MULTI-CLUSTER FEDERATION DEMO ---"
+          echo "Persona:   oidc:platform-admins"
+          echo "Context:   cluster/manager-us-east-1"
+          echo "Action:    Distributing RBAC and NetworkPolicies to leaf clusters..."
+          echo "Status:    SUCCESS (Simulated)"
+          echo "--------------------------------------"
+
+  # ---------------------------------------------------------------------------
+  # WORKLOAD CLUSTER JOB
+  # Simulates developers/auditors interacting with the leaf workload cluster
+  # ---------------------------------------------------------------------------
+  workload-audit:
+    name: "Demo: Workload Cluster (Leaf)"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Simulate Read-Only Audit
+        run: |
+          echo "--- MULTI-CLUSTER FEDERATION DEMO ---"
+          echo "Persona:   oidc:developers (Read-only)"
+          echo "Context:   cluster/workload-prod-01"
+          echo "Action:    Checking pod security and namespace isolation..."
+          echo "Result:    No violations found. Guardrails enforced via OIDC mapping."
+          echo "Status:    SUCCESS (Simulated)"
+          echo "--------------------------------------"

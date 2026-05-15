@@ -120,26 +120,7 @@ jobs:
       - name: Preflight validation (authorization & infrastructure checks)
         shell: bash
         run: |
-          set -euo pipefail
-
-          # Helper function: Assert positive authorization (expect "yes")
-          expect_yes() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect yes): $check => $result"
-            [ "$result" = "yes" ] || { echo "Authorization check failed (expected yes)."; exit 1; }
-          }
-
-          # Helper function: Assert negative authorization (expect "no" - deny guardrail)
-          expect_no() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect no): $check => $result"
-            [ "$result" = "no" ] || { echo "Authorization check failed (expected no)."; exit 1; }
-          }
-
+          source scripts/github-actions/k8s-auth-helpers.sh
           # Low-risk positive check: Confirms authenticated cluster visibility
           kubectl get --raw='/version' > /dev/null
           echo "API server reachable."
@@ -179,38 +160,36 @@ jobs:
           helm lint charts/myapp
           echo "Helm chart passed lint."
 
+      - name: Determine deployment target
+        id: set_target
+        shell: bash
+        run: |
+          TARGET_NAMESPACE=""
+          HELM_VALUES_FILE=""
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            TARGET_NAMESPACE="app-prod"
+            HELM_VALUES_FILE="charts/myapp/values-prod.yaml"
+            echo "Deploying to app-prod namespace (main branch)..."
+          else
+            TARGET_NAMESPACE="app-staging"
+            HELM_VALUES_FILE="charts/myapp/values-staging.yaml"
+            echo "Deploying to app-staging namespace (develop branch)..."
+          fi
+          echo "TARGET_NAMESPACE=${TARGET_NAMESPACE}" >> "$GITHUB_OUTPUT"
+          echo "HELM_VALUES_FILE=${HELM_VALUES_FILE}" >> "$GITHUB_OUTPUT"
+
       # -----------------------------------------------------------------------
       # DEPLOYMENT: Conditional based on branch (develop→staging, main→prod)
       # Each uses environment-specific values and secrets
       # -----------------------------------------------------------------------
-      - name: Deploy to app-staging (develop branch)
-        if: github.ref_name == 'develop'
+      - name: Deploy application with Helm
         shell: bash
         run: |
           set -euo pipefail
           
-          echo "Deploying to app-staging namespace (develop branch)..."
-          
           helm upgrade --install "${HELM_RELEASE}" charts/myapp \
-            --namespace app-staging \
-            --values charts/myapp/values-staging.yaml \
-            --set image.repository="${{ needs.build.outputs.image_uri }}" \
-            --set image.tag="" \
-            --atomic \
-            --timeout 5m \
-            --wait
-
-      - name: Deploy to app-prod (main branch)
-        if: github.ref_name == 'main'
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          echo "Deploying to app-prod namespace (main branch)..."
-          
-          helm upgrade --install "${HELM_RELEASE}" charts/myapp \
-            --namespace app-prod \
-            --values charts/myapp/values-prod.yaml \
+            --namespace "${{ steps.set_target.outputs.TARGET_NAMESPACE }}" \
+            --values "${{ steps.set_target.outputs.HELM_VALUES_FILE }}" \
             --set image.repository="${{ needs.build.outputs.image_uri }}" \
             --set image.tag="" \
             --atomic \
@@ -223,27 +202,23 @@ jobs:
       - name: Post-deployment validation (verify guardrails remain)
         shell: bash
         run: |
-          set -euo pipefail
-
-          expect_yes() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect yes): $check => $result"
-            [ "$result" = "yes" ] || { echo "Authorization check failed (expected yes)."; exit 1; }
-          }
-
-          expect_no() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect no): $check => $result"
-            [ "$result" = "no" ] || { echo "Authorization check failed (expected no)."; exit 1; }
-          }
+          source scripts/github-actions/k8s-auth-helpers.sh
 
           # Re-verify deployment permission still exists
           expect_yes "kubectl auth can-i get deployments -n app-prod" \
             || { echo "Lost deployment read permission."; exit 1; }
+
+          # Re-verify deployment permission still exists for staging
+          expect_yes "kubectl auth can-i get deployments -n app-staging" \
+            || { echo "Lost deployment read permission."; exit 1; }
+
+          # Re-verify guardrails still enforced for clusterrolebindings
+          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io" \
+            || { echo "Guardrail compromised: cluster RBAC binding creation allowed."; exit 1; }
+
+          # Re-verify guardrails still enforced for staging secrets
+          expect_no "kubectl auth can-i get secrets -n app-staging" \
+            || { echo "Guardrail compromised: direct secret access allowed."; exit 1; }
 
           # Re-verify guardrails still enforced
           expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io" \
@@ -255,6 +230,7 @@ jobs:
 
       - name: Wait for deployment rollout
         shell: bash
+        id: set_post_deploy_target
         run: |
           set -euo pipefail
           
@@ -264,6 +240,7 @@ jobs:
           kubectl rollout status deployment/${HELM_RELEASE} \
             -n "${TARGET_NAMESPACE}" \
             --timeout=5m
+          echo "TARGET_NAMESPACE=${TARGET_NAMESPACE}" >> "$GITHUB_OUTPUT"
           
           echo "Deployment ${HELM_RELEASE} rolled out successfully."
 
@@ -272,7 +249,8 @@ jobs:
         run: |
           set -euo pipefail
           
-          TARGET_NAMESPACE="${{ github.ref_name == 'main' && 'app-prod' || 'app-staging' }}"
+          # Use the TARGET_NAMESPACE determined in the previous step
+          TARGET_NAMESPACE="${{ steps.set_post_deploy_target.outputs.TARGET_NAMESPACE }}"
           IMAGE_DEPLOYED=$(kubectl get deployment ${HELM_RELEASE} -n "${TARGET_NAMESPACE}" \
             -o jsonpath='{.spec.template.spec.containers[0].image}')
           
