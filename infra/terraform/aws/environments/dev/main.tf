@@ -294,7 +294,7 @@ module "eks_cluster" {
     }
     # Deploy role: group-only entry; permissions are managed by Kubernetes RBAC (ClusterRole/RoleBinding)
     github_actions_deploy = {
-      principal_arn = module.github_oidc_role_deploy_prod.role_arn 
+      principal_arn     = module.github_oidc_role_deploy_prod.role_arn
       kubernetes_groups = ["github:ci-deployers"]
     }
   }
