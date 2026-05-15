@@ -41,22 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          expect_yes() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect yes): $check => $result"
-            [ "$result" = "yes" ] || { echo "Authorization check failed (expected yes)."; exit 1; }
-          }
-
-          expect_no() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect no): $check => $result"
-            [ "$result" = "no" ] || { echo "Authorization check failed (expected no)."; exit 1; }
-          }
+          source scripts/github-actions/k8s-auth-helpers.sh
 
           # API server reachability check before any applies.
           kubectl get --raw='/version' > /dev/null
@@ -89,22 +74,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          expect_yes() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect yes): $check => $result"
-            [ "$result" = "yes" ] || { echo "Authorization check failed (expected yes)."; exit 1; }
-          }
-
-          expect_no() {
-            local check="$1"
-            local result
-            result="$(eval "$check")"
-            echo "CHECK (expect no): $check => $result"
-            [ "$result" = "no" ] || { echo "Authorization check failed (expected no)."; exit 1; }
-          }
+          source scripts/github-actions/k8s-auth-helpers.sh
 
           # Positive checks run only after namespace RoleBindings are in place.
           expect_yes "kubectl auth can-i create deployments.apps -n app-prod"

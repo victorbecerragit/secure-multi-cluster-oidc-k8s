@@ -10,7 +10,6 @@ on:
       - ".github/workflows/ci-cd-eks.yml"
   workflow_dispatch:
 
-# OIDC requires: id-token write permission to request JWT from GitHub OIDC provider
 permissions:
   id-token: write
   contents: read
@@ -22,26 +21,20 @@ env:
   HELM_RELEASE: myapp
 
 jobs:
-  # =====================================================================
-  # BUILD JOB: Authenticate as build role, build image, push to ECR
-  # =====================================================================
   build:
     runs-on: ubuntu-latest
     if: ${{ vars.AWS_GITHUB_BUILD_ROLE_ARN != '' }}
 
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
+      image_repository: ${{ steps.meta.outputs.image_repository }}
       image_uri: ${{ steps.meta.outputs.image_uri }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # -----------------------------------------------------------------------
-      # OIDC Authentication: Exchange GitHub token for AWS credentials (build role)
-      # Role must have minimal permissions: ECR repository creation + push
-      # -----------------------------------------------------------------------
-      - name: Configure AWS Credentials via GitHub OIDC (build role in prod)
+      - name: Configure AWS Credentials via GitHub OIDC (build role)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_GITHUB_BUILD_ROLE_ARN }}
@@ -55,8 +48,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          aws ecr describe-repositories --repository-names "${ECR_REPOSITORY}" >/dev/null 2>&1 || \
-          aws ecr create-repository --repository-name "${ECR_REPOSITORY}" >/dev/null
+          aws ecr describe-repositories --repository-names "${ECR_REPOSITORY}" >/dev/null 2>&1 ||           aws ecr create-repository --repository-name "${ECR_REPOSITORY}" >/dev/null
 
       - name: Compute image metadata
         id: meta
@@ -64,8 +56,10 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE_TAG="${GITHUB_SHA::12}"
-          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          IMAGE_REPOSITORY="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}"
+          IMAGE_URI="${IMAGE_REPOSITORY}:${IMAGE_TAG}"
           echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_repository=${IMAGE_REPOSITORY}" >> "$GITHUB_OUTPUT"
           echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push container image
@@ -77,37 +71,35 @@ jobs:
           docker push "${{ steps.meta.outputs.image_uri }}"
           echo "Image pushed: ${{ steps.meta.outputs.image_uri }}"
 
-  # =====================================================================
-  # DEPLOY JOB: Authenticate as deploy role, validate, deploy with Helm
-  # =====================================================================
   deploy:
     runs-on: ubuntu-latest
     needs: [build]
     environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
-    if: ${{ vars.AWS_GITHUB_DEPLOY_ROLE_ARN != '' }}
+    if: ${{ github.ref_name == 'main' && vars.AWS_GITHUB_DEPLOY_ROLE_PROD_ARN != '' || github.ref_name != 'main' && vars.AWS_GITHUB_DEPLOY_ROLE_STAGING_ARN != '' }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Debug GitHub context
+      - name: Select deploy role
+        id: select_role
+        shell: bash
         run: |
-          echo "ref_name=${GITHUB_REF_NAME}"
-          echo "ref=${GITHUB_REF}"
-          echo "ref_type=${GITHUB_REF_TYPE}"
-          echo "sha=${GITHUB_SHA}"
-          echo "repository=${GITHUB_REPOSITORY}"        
-          echo "repository_owner=${GITHUB_REPOSITORY_OWNER}"
-          echo "repository_id=${GITHUB_REPOSITORY_ID}"
-          
-      # -----------------------------------------------------------------------
-      # OIDC Authentication: Exchange GitHub token for AWS credentials (deploy role)
-      # Role must have minimal permissions: EKS cluster access + namespace operations
-      # -----------------------------------------------------------------------
+          set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            echo "role_arn=${{ vars.AWS_GITHUB_DEPLOY_ROLE_PROD_ARN }}" >> "$GITHUB_OUTPUT"
+            echo "target_namespace=app-prod" >> "$GITHUB_OUTPUT"
+            echo "values_file=helm/charts/myapp/values-prod.yaml" >> "$GITHUB_OUTPUT"
+          else
+            echo "role_arn=${{ vars.AWS_GITHUB_DEPLOY_ROLE_STAGING_ARN }}" >> "$GITHUB_OUTPUT"
+            echo "target_namespace=app-staging" >> "$GITHUB_OUTPUT"
+            echo "values_file=helm/charts/myapp/values-staging.yaml" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure AWS Credentials via GitHub OIDC (deploy role)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_GITHUB_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ steps.select_role.outputs.role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Install kubectl
@@ -120,49 +112,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          aws eks update-kubeconfig \
-            --name "${EKS_CLUSTER_NAME}" \
-            --region "${AWS_REGION}"
+          aws eks update-kubeconfig  --name "${EKS_CLUSTER_NAME}"  --region "${AWS_REGION}"
 
-      # -----------------------------------------------------------------------
-      # PREFLIGHT VALIDATION: Authorization guardrails and namespace existence
-      # Uses structured helper functions for consistent logging and error handling
-      # -----------------------------------------------------------------------
       - name: Preflight validation (authorization & infrastructure checks)
         shell: bash
         run: |
+          set -euo pipefail
           source scripts/github-actions/k8s-auth-helpers.sh
-          # Low-risk positive check: Confirms authenticated cluster visibility
+
           kubectl get --raw='/version' > /dev/null
           echo "API server reachable."
-
-          # Positive check: Confirm we can query namespaces (required for validation)
           expect_yes "kubectl auth can-i get namespaces"
-
-          # Negative guardrails: Prevent privilege escalation vectors
-          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io" \
-            || { echo "Cluster RBAC creation not permitted by design."; exit 1; }
-          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io" \
-            || { echo "Cluster RBAC binding creation not permitted by design."; exit 1; }
-          expect_no "kubectl auth can-i get secrets -n app-prod" \
-            || { echo "Direct secret access not permitted by design."; exit 1; }
-          expect_no "kubectl auth can-i get secrets -n app-staging" \
-            || { echo "Direct secret access not permitted by design."; exit 1; }
-
+          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i get secrets -n ${{ steps.select_role.outputs.target_namespace }}"
           echo "All preflight authorization checks passed."
 
       - name: Validate bootstrap infrastructure exists
         shell: bash
         run: |
           set -euo pipefail
-          
-          # Namespaces are managed by bootstrap (terraform), not by deploy role
-          kubectl get namespace app-prod > /dev/null \
-            || { echo "Namespace app-prod not found (bootstrap infrastructure missing)."; exit 1; }
-          kubectl get namespace app-staging > /dev/null \
-            || { echo "Namespace app-staging not found (bootstrap infrastructure missing)."; exit 1; }
-          
-          echo "Bootstrap namespaces validated: app-prod, app-staging"
+          kubectl get namespace "${{ steps.select_role.outputs.target_namespace }}" > /dev/null || {
+            echo "Namespace ${{ steps.select_role.outputs.target_namespace }} not found (bootstrap infrastructure missing)."; exit 1;
+          }
+          echo "Bootstrap namespace validated: ${{ steps.select_role.outputs.target_namespace }}"
 
       - name: Helm chart lint (detect configuration errors early)
         shell: bash
@@ -171,72 +144,22 @@ jobs:
           helm lint helm/charts/myapp
           echo "Helm chart passed lint."
 
-      - name: Determine deployment target
-        id: set_target
-        shell: bash
-        run: |
-          TARGET_NAMESPACE=""
-          HELM_VALUES_FILE=""
-          if [[ "${{ github.ref_name }}" == "main" ]]; then
-            TARGET_NAMESPACE="app-prod"
-            HELM_VALUES_FILE="helm/charts/myapp/values-prod.yaml"
-            echo "Deploying to app-prod namespace (main branch)..."
-          else
-            TARGET_NAMESPACE="app-staging"
-            HELM_VALUES_FILE="charts/myapp/values-staging.yaml"
-            echo "Deploying to app-staging namespace (develop branch)..."
-          fi
-          echo "TARGET_NAMESPACE=${TARGET_NAMESPACE}" >> "$GITHUB_OUTPUT"
-          echo "HELM_VALUES_FILE=${HELM_VALUES_FILE}" >> "$GITHUB_OUTPUT"
-
-      # -----------------------------------------------------------------------
-      # DEPLOYMENT: Conditional based on branch (develop→staging, main→prod)
-      # Each uses environment-specific values and secrets
-      # -----------------------------------------------------------------------
       - name: Deploy application with Helm
         shell: bash
         run: |
           set -euo pipefail
-          
-          helm upgrade --install "${HELM_RELEASE}" helm/charts/myapp \
-            --namespace "${{ steps.set_target.outputs.TARGET_NAMESPACE }}" \
-            --values "${{ steps.set_target.outputs.HELM_VALUES_FILE }}" \
-            --set image.repository="${{ needs.build.outputs.image_uri }}" \
-            --set image.tag="" \
-            --atomic \
-            --timeout 5m \
-            --wait
+          helm upgrade --install "${HELM_RELEASE}" helm/charts/myapp --namespace "${{ steps.select_role.outputs.target_namespace }}"  --values "${{ steps.select_role.outputs.values_file }}"  --set image.repository="${{ needs.build.outputs.image_repository }}"  --set-string image.tag="${{ needs.build.outputs.image_tag }}"  --atomic  --timeout 5m  --wait
 
-      # -----------------------------------------------------------------------
-      # POST-DEPLOYMENT VALIDATION: Verify permissions and guardrails still enforced
-      # -----------------------------------------------------------------------
       - name: Post-deployment validation (verify guardrails remain)
         shell: bash
         run: |
+          set -euo pipefail
           source scripts/github-actions/k8s-auth-helpers.sh
-
-          # Re-verify deployment permission still exists
-          expect_yes "kubectl auth can-i get deployments -n app-prod" \
-            || { echo "Lost deployment read permission."; exit 1; }
-
-          # Re-verify deployment permission still exists for staging
-          expect_yes "kubectl auth can-i get deployments -n app-staging" \
-            || { echo "Lost deployment read permission."; exit 1; }
-
-          # Re-verify guardrails still enforced for clusterrolebindings
-          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io" \
-            || { echo "Guardrail compromised: cluster RBAC binding creation allowed."; exit 1; }
-
-          # Re-verify guardrails still enforced for staging secrets
-          expect_no "kubectl auth can-i get secrets -n app-staging" \
-            || { echo "Guardrail compromised: direct secret access allowed."; exit 1; }
-
-          # Re-verify guardrails still enforced
-          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io" \
-            || { echo "Guardrail compromised: cluster RBAC creation allowed."; exit 1; }
-          expect_no "kubectl auth can-i get secrets -n app-prod" \
-            || { echo "Guardrail compromised: direct secret access allowed."; exit 1; }
-
+          TARGET_NAMESPACE="${{ steps.select_role.outputs.target_namespace }}"
+          expect_yes "kubectl auth can-i get deployments -n ${TARGET_NAMESPACE}"
+          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i get secrets -n ${TARGET_NAMESPACE}"
           echo "Post-deployment guardrails verified."
 
       - name: Wait for deployment rollout
@@ -244,31 +167,19 @@ jobs:
         id: set_post_deploy_target
         run: |
           set -euo pipefail
-          
-          TARGET_NAMESPACE="${{ github.ref_name == 'main' && 'app-prod' || 'app-staging' }}"
-          
+          TARGET_NAMESPACE="${{ steps.select_role.outputs.target_namespace }}"
           echo "Waiting for ${HELM_RELEASE} deployment rollout in ${TARGET_NAMESPACE}..."
-          kubectl rollout status deployment/${HELM_RELEASE} \
-            -n "${TARGET_NAMESPACE}" \
-            --timeout=5m
+          kubectl rollout status deployment/${HELM_RELEASE} -n "${TARGET_NAMESPACE}" --timeout=5m
           echo "TARGET_NAMESPACE=${TARGET_NAMESPACE}" >> "$GITHUB_OUTPUT"
-          
           echo "Deployment ${HELM_RELEASE} rolled out successfully."
 
       - name: Verify deployed image
         shell: bash
         run: |
           set -euo pipefail
-          
-          # Use the TARGET_NAMESPACE determined in the previous step
           TARGET_NAMESPACE="${{ steps.set_post_deploy_target.outputs.TARGET_NAMESPACE }}"
-          IMAGE_DEPLOYED=$(kubectl get deployment ${HELM_RELEASE} -n "${TARGET_NAMESPACE}" \
-            -o jsonpath='{.spec.template.spec.containers[0].image}')
-          
+          IMAGE_DEPLOYED=$(kubectl get deployment ${HELM_RELEASE} -n "${TARGET_NAMESPACE}" -o jsonpath='{.spec.template.spec.containers[0].image}')
           echo "Deployed image: ${IMAGE_DEPLOYED}"
           echo "Expected image: ${{ needs.build.outputs.image_uri }}"
-          
-          [[ "${IMAGE_DEPLOYED}" == *"${{ needs.build.outputs.image_tag }}"* ]] \
-            || { echo "Image mismatch detected."; exit 1; }
-          
+          [[ "${IMAGE_DEPLOYED}" == *"${{ needs.build.outputs.image_tag }}"* ]] || { echo "Image mismatch detected."; exit 1; }
           echo "Deployed image verified."
