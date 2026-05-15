@@ -153,3 +153,14 @@ variable "github_deploy_subject_value" {
   type        = string
   default     = "main"
 }
+
+
+# ---------------------------------------------------------------------------
+# Build role – separate GitHub Actions identity for container image build operationsole – separate GitHub Actions identity for kubectl apply operations
+# ---------------------------------------------------------------------------
+
+variable "github_build_subject_value" {
+  description = "Branch name or environment name that the deploy OIDC role trusts. Defaults to 'main'. For production use, prefer an environment name (e.g. 'eks-deploy') to restrict access to jobs running in a named GitHub environment with required reviewers."
+  type        = string
+  default     = "main"
+}

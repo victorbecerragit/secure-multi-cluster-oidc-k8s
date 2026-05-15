@@ -18,7 +18,7 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   EKS_CLUSTER_NAME: ${{ vars.AWS_EKS_CLUSTER_NAME }}
-  ECR_REPOSITORY: myapp
+  ECR_REPOSITORY: ecr-myapp
   HELM_RELEASE: myapp
 
 jobs:

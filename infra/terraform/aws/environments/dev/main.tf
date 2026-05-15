@@ -228,7 +228,7 @@ module "github_oidc_role_deploy" {
   github_owner               = var.github_owner
   github_repo                = var.github_repo
   subject_type               = var.github_subject_type
-  subject_value              = "*"  # deploy role trusts all subjects or branches // var.github_deploy_subject_value
+  subject_value              = var.github_deploy_subject_value
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
@@ -244,7 +244,7 @@ module "github_oidc_role_build" {
   github_owner               = var.github_owner
   github_repo                = var.github_repo
   subject_type               = var.github_subject_type
-  subject_value              = "*"
+  subject_value              = var.github_deploy_subject_value
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   managed_policy_arns        = ["arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"]
