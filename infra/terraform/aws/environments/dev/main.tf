@@ -320,6 +320,13 @@ module "eks_cluster" {
       principal_arn     = module.github_oidc_role_deploy_dev.role_arn
       kubernetes_groups = ["github:ci-deployers"]
     }
+    # Local developer access (YOU)
+    local_dev_user = {
+      principal_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/victor"
+      kubernetes_groups = ["system:masters"]
+      policy_arn        = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+      access_scope_type = "cluster"
+    }
   }
 
   tags = local.common_tags

@@ -73,3 +73,36 @@ kubectl auth can-i "*" "*" --all-namespaces
 # Verify namespace isolation
 kubectl get pods -n app-prod
 ```
+
+---
+
+## Troubleshooting & Debugging
+
+### EKS Access Entry Review
+The cluster uses API-based Access Entries instead of the legacy `aws-auth` ConfigMap. Use these AWS CLI commands to verify who has access to the cluster:
+
+```bash
+# List all principals authorized via Access Entries
+aws eks list-access-entries --cluster-name <cluster-name>
+
+# View details for a specific principal (e.g., your local user)
+aws eks describe-access-entry --cluster-name <cluster-name> --principal-arn <iam-arn>
+```
+
+### Local Connectivity
+By default, newly created clusters may block your local IAM identity even if you created the cluster. Ensure your identity is mapped in the `access_entries` section of `infra/terraform/aws/environments/dev/main.tf`:
+
+```hcl
+# Example mapping for local connectivity
+local_dev_user = {
+  principal_arn     = "arn:aws:iam::<account-id>:user/<username>"
+  kubernetes_groups = ["system:masters"]
+  policy_arn        = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  access_scope_type = "cluster"
+}
+```
+
+Once applied, update your local kubeconfig:
+```bash
+aws eks update-kubeconfig --name <cluster-name> --region <region>
+```
