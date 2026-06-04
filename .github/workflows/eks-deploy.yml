@@ -47,11 +47,12 @@ jobs:
           kubectl get --raw='/version' > /dev/null
 
           # Low-risk positive check: confirms authenticated cluster visibility.
-          expect_yes "kubectl auth can-i get namespaces"
+          expect_yes "kubectl auth can-i --list --namespace=default"
 
           # Guardrails must hold before any resource apply.
           expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
           expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i get secrets -n app-dev"
           expect_no "kubectl auth can-i get secrets -n app-prod"
           expect_no "kubectl auth can-i get secrets -n app-staging"
 
@@ -60,6 +61,7 @@ jobs:
           set -euo pipefail
           # Namespaces are cluster-wide infrastructure managed by bootstrap/Terraform.
           # Deploy CI validates they exist rather than creating them.
+          kubectl get namespace app-dev > /dev/null || { echo "Namespace app-dev not found. Bootstrap must create it first."; exit 1; }
           kubectl get namespace app-prod > /dev/null || { echo "Namespace app-prod not found. Bootstrap must create it first."; exit 1; }
           kubectl get namespace app-staging > /dev/null || { echo "Namespace app-staging not found. Bootstrap must create it first."; exit 1; }
 
@@ -67,6 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           # Namespace-scoped RBAC only. ClusterRole is bootstrap/platform-managed.
+          kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-dev.yaml
           kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-prod.yaml
           kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-staging.yaml
 
@@ -77,16 +80,20 @@ jobs:
           source scripts/github-actions/k8s-auth-helpers.sh
 
           # Positive checks run only after namespace RoleBindings are in place.
+          expect_yes "kubectl auth can-i create deployments.apps -n app-dev"
+          expect_yes "kubectl auth can-i patch deployments.apps -n app-dev"
           expect_yes "kubectl auth can-i create deployments.apps -n app-prod"
           expect_yes "kubectl auth can-i patch deployments.apps -n app-prod"
           expect_yes "kubectl auth can-i create deployments.apps -n app-staging"
           expect_yes "kubectl auth can-i patch deployments.apps -n app-staging"
+          expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-dev"
           expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-prod"
           expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-staging"
 
           # Guardrails must remain denied after applies.
           expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
           expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i get secrets -n app-dev"
           expect_no "kubectl auth can-i get secrets -n app-prod"
           expect_no "kubectl auth can-i get secrets -n app-staging"
 
@@ -97,5 +104,6 @@ jobs:
           # matching policy is permitted. Apply baseline allows first, then restrictive
           # policies, for predictable rollout ordering.
           kubectl apply -f policies/network/baseline-allow.yaml
+          kubectl apply -n app-dev -f policies/network/default-deny.yaml
           kubectl apply -n app-prod -f policies/network/default-deny.yaml
           kubectl apply -n app-staging -f policies/network/default-deny.yaml
