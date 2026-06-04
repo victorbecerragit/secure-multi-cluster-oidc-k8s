@@ -55,6 +55,8 @@ jobs:
           expect_no "kubectl auth can-i get secrets -n app-dev"
           expect_no "kubectl auth can-i get secrets -n app-prod"
           expect_no "kubectl auth can-i get secrets -n app-staging"
+          expect_no "kubectl auth can-i get secrets -n app-prod"
+          expect_no "kubectl auth can-i get secrets -n app-staging"
 
       - name: Validate namespaces exist (created by bootstrap)
         run: |
@@ -69,6 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           # Namespace-scoped RBAC only. ClusterRole is bootstrap/platform-managed.
+          # If this step fails with 403, Platform Admin must bootstrap the bindings.
           kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-dev.yaml
           kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-prod.yaml
           kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-staging.yaml
@@ -86,6 +89,8 @@ jobs:
           expect_yes "kubectl auth can-i patch deployments.apps -n app-prod"
           expect_yes "kubectl auth can-i create deployments.apps -n app-staging"
           expect_yes "kubectl auth can-i patch deployments.apps -n app-staging"
+          
+          # Networking permissions
           expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-dev"
           expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-prod"
           expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-staging"

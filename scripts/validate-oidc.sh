@@ -98,9 +98,12 @@ run_check() {
   local ACTION=$4
   local RESOURCE=$5
   local NAMESPACE=$6
+  local EXPECTED_PASS=${7:-true}
 
   echo "[${USER}] testing on ${CONTEXT}..."
   TOKEN=$(get_oidc_token "$USER")
+
+  local ACTUAL_PASS=false
 
   if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
     if [ "$ALLOW_IMPERSONATION_FALLBACK" = "true" ]; then
@@ -109,36 +112,42 @@ run_check() {
         --as "oidc:${USER}" \
         --as-group "oidc:${GROUP}" \
         ${NAMESPACE:+-n $NAMESPACE} \
-        --context "$CONTEXT"; then
-        echo "✅ ${USER} allowed $ACTION $RESOURCE on $CONTEXT (impersonation fallback)"
-        return
+        --context "$CONTEXT" >/dev/null 2>&1; then
+        ACTUAL_PASS=true
       fi
-
-      echo "❌ ${USER} denied $ACTION $RESOURCE on $CONTEXT (impersonation fallback)"
+    else
+      echo "ERROR: Failed to obtain OIDC token for user '$USER' and strict mode is enabled." >&2
+      echo "Hint: run scripts/setup-keycloak.sh or set ALLOW_IMPERSONATION_FALLBACK=true." >&2
       exit 1
     fi
-
-    echo "ERROR: Failed to obtain OIDC token for user '$USER' and strict mode is enabled." >&2
-    echo "Hint: run scripts/setup-keycloak.sh or set ALLOW_IMPERSONATION_FALLBACK=true." >&2
-    exit 1
+  else
+    if kubectl --token "$TOKEN" auth can-i "$ACTION" "$RESOURCE" \
+      ${NAMESPACE:+-n $NAMESPACE} \
+      --context "$CONTEXT" >/dev/null 2>&1; then
+      ACTUAL_PASS=true
+    fi
   fi
 
-  # Decode payload for debugging (optional)
-  # echo "$TOKEN" | cut -d '.' -f2 | base64 -d | jq .
-
-  if kubectl --token "$TOKEN" auth can-i "$ACTION" "$RESOURCE" \
-    ${NAMESPACE:+-n $NAMESPACE} \
-    --context "$CONTEXT"; then
-    echo "✅ ${USER} allowed $ACTION $RESOURCE on $CONTEXT"
+  if [ "$ACTUAL_PASS" = "$EXPECTED_PASS" ]; then
+    local STATUS="✅"
+    [ "$EXPECTED_PASS" = "false" ] && STATUS="🚫"
+    echo "$STATUS ${USER} $([ "$EXPECTED_PASS" = "true" ] && echo "allowed" || echo "correctly denied") $ACTION $RESOURCE on $CONTEXT"
   else
-    echo "❌ ${USER} denied $ACTION $RESOURCE on $CONTEXT"
+    echo "❌ ${USER} expected $([ "$EXPECTED_PASS" = "true" ] && echo "allow" || echo "deny") but got $([ "$ACTUAL_PASS" = "true" ] && echo "allow" || echo "deny") for $ACTION $RESOURCE on $CONTEXT"
     exit 1
   fi
 }
 
 # Positive test cases
-run_check "alice.admin" "platform-admins" "kind-manager" "get" "nodes"
-run_check "ci.deployer" "ci-deployers" "kind-manager" "create" "deployments" "app-prod"
-run_check "bob.viewer" "developers" "kind-workload" "get" "pods" "app-staging"
+run_check "alice.admin" "platform-admins" "kind-manager" "get" "nodes" "" "true"
+run_check "ci.deployer" "ci-deployers" "kind-manager" "create" "deployments" "app-prod" "true"
+run_check "bob.viewer" "developers" "kind-workload" "get" "pods" "app-staging" "true"
+run_check "charlie.auditor" "security-auditors" "kind-manager" "get" "nodes" "" "true"
 
-echo "All positive OIDC validation checks passed."
+# Negative test cases (Denial checks)
+echo "--- Running Denial Checks ---"
+run_check "bob.viewer" "developers" "kind-manager" "delete" "nodes" "" "false"
+run_check "ci.deployer" "ci-deployers" "kind-manager" "delete" "namespace" "kube-system" "false"
+run_check "charlie.auditor" "security-auditors" "kind-workload" "create" "pods" "app-prod" "false"
+
+echo "All OIDC validation checks (positive and negative) passed."

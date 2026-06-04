@@ -13,7 +13,7 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
   - apiGroups: [""]
-    resources: ["services", "configmaps", "persistentvolumeclaims", "endpoints", "pods"]
+    resources: ["services", "configmaps", "persistentvolumeclaims", "endpoints", "pods", "events"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
   - apiGroups: ["networking.k8s.io"]
@@ -27,3 +27,11 @@ rules:
   - apiGroups: ["autoscaling"]
     resources: ["horizontalpodautoscalers"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: [""]
+    resources: ["nodes", "namespaces", "persistentvolumes", "storageclasses"]
+    verbs: ["get", "list", "watch"]

@@ -26,7 +26,8 @@ function create_cluster() {
     # 1. Namespaces
     kubectl apply -f "$REPO_ROOT/examples/namespaces/app-namespaces.yaml"
 
-    # 2. RBAC
+    # 2. RBAC Roles and Bindings
+    kubectl apply -f "$REPO_ROOT/rbac/roles/"
     kubectl apply -f "$REPO_ROOT/rbac/$name/bindings/"
 
     # 3. NetworkPolicies

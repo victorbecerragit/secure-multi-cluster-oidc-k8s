@@ -1,8 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: ci-deployer-oidc
-  namespace: app-prod
+  name: ci-visibility-oidc
 subjects:
 - kind: Group
   name: "oidc:ci-deployers"

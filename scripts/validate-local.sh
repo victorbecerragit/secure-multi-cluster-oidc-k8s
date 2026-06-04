@@ -18,7 +18,7 @@ function validate_cluster() {
     
     # 2. Basic PSA verification (Check for labels on namespaces)
     echo -n "Verifying PSA labels on app-prod... "
-    if kubectl get ns app-prod -o jsonpath='{.metadata.labels}' | grep -q "pod-security.kubernetes.io/enforce:restricted"; then
+    if kubectl get ns app-prod -L pod-security.kubernetes.io/enforce | grep -q "restricted"; then
         echo "OK"
     else
         echo "FAILED"

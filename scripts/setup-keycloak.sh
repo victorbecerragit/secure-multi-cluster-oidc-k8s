@@ -262,6 +262,7 @@ ensure_group "security-auditors"
 
 upsert_user "alice.admin" "password123" "platform-admins" "Alice" "Admin"
 upsert_user "bob.viewer" "password123" "developers" "Bob" "Viewer"
+upsert_user "charlie.auditor" "password123" "security-auditors" "Charlie" "Auditor"
 upsert_user "ci.deployer" "password123" "ci-deployers" "CI" "Deployer"
 
 echo "=== Keycloak Setup Complete ==="
