@@ -60,7 +60,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
 
       - name: Terraform fmt
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} fmt -check -recursive
