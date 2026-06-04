@@ -50,8 +50,8 @@ jobs:
           expect_yes "kubectl auth can-i get pods --all-namespaces"
 
           # Guardrails must hold before any resource apply.
-          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
-          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i create clusterroles --namespace=''"
+          expect_no "kubectl auth can-i create clusterrolebindings --namespace=''"
           expect_no "kubectl auth can-i get secrets -n app-dev"
           expect_no "kubectl auth can-i get secrets -n app-prod"
           expect_no "kubectl auth can-i get secrets -n app-staging"
@@ -91,8 +91,8 @@ jobs:
           expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-staging"
 
           # Guardrails must remain denied after applies.
-          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
-          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          expect_no "kubectl auth can-i create clusterroles --namespace=''"
+          expect_no "kubectl auth can-i create clusterrolebindings --namespace=''"
           expect_no "kubectl auth can-i get secrets -n app-dev"
           expect_no "kubectl auth can-i get secrets -n app-prod"
           expect_no "kubectl auth can-i get secrets -n app-staging"

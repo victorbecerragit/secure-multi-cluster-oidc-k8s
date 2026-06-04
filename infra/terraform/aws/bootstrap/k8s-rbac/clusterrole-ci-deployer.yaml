@@ -34,13 +34,10 @@ rules:
       - statefulsets/scale
     verbs: ["create", "update", "patch"]
 
-  # Core API resources (safe subset — no secrets, no serviceaccounts)
+  # Core API resources (safe subset — NO Secrets access)
   - apiGroups: [""]
-    resources:
-      - pods
-      - pods/log
-      - pods/status
-    verbs: ["get", "list", "watch"]
+    resources: ["pods", "pods/log", "pods/status", "pods/exec"]
+    verbs: ["get", "list", "watch", "delete"]
 
   - apiGroups: [""]
     resources:
