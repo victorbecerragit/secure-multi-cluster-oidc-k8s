@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "secure-mc-tfstate-200227355781"
+    bucket       = "secure-mc-tfstate-dev-2026"
     key          = "environments/dev/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
