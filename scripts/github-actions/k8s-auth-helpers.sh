@@ -5,7 +5,8 @@ set -euo pipefail
 expect_yes() {
   local check="$1"
   local result
-  result="$(eval "$check")"
+  # Redirect stderr and only take the last line of stdout to avoid warnings polluting the check.
+  result="$(eval "$check" 2>/dev/null | tail -n 1 | xargs)"
   echo "CHECK (expect yes): $check => $result"
   [ "$result" = "yes" ] || { echo "Authorization check failed (expected yes)."; exit 1; }
 }
@@ -14,7 +15,8 @@ expect_yes() {
 expect_no() {
   local check="$1"
   local result
-  result="$(eval "$check")"
+  # Redirect stderr and only take the last line of stdout to avoid warnings polluting the check.
+  result="$(eval "$check" 2>/dev/null | tail -n 1 | xargs)"
   echo "CHECK (expect no): $check => $result"
   [ "$result" = "no" ] || { echo "Authorization check failed (expected no)."; exit 1; }
 }
