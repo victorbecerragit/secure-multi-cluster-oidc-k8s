@@ -62,12 +62,27 @@ jobs:
           echo "image_repository=${IMAGE_REPOSITORY}" >> "$GITHUB_OUTPUT"
           echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push container image
+      - name: Build container image
         shell: bash
         run: |
           set -euo pipefail
           cd app
           docker build -t "${{ steps.meta.outputs.image_uri }}" .
+
+      - name: Trivy Image Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta.outputs.image_uri }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push container image
+        shell: bash
+        run: |
+          set -euo pipefail
           docker push "${{ steps.meta.outputs.image_uri }}"
           echo "Image pushed: ${{ steps.meta.outputs.image_uri }}"
 

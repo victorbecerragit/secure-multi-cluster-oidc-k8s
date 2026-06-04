@@ -31,6 +31,8 @@ Phase 6.5 delivers a production-grade CI/CD pipeline that automates application 
 ✅ Post-deployment guardrail verification
 ✅ Symmetric authorization checks
 ✅ Environment-based promotion (staging/prod)
+✅ Checkov Static Analysis (IaC Security)
+✅ Trivy Container/Filing Scanning (CVE/Secrets)
 ```
 
 ---

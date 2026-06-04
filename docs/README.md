@@ -24,6 +24,7 @@ Complete technical documentation for secure multi-cluster Kubernetes OIDC federa
 ### Security Review Reference
 
 - **[security-assessment-2026-06-04.md](./security-assessment-2026-06-04.md)** - Independent architecture and configuration assessment with prioritized hardening recommendations
+- **[eks-deployment-runbook.md](./eks-deployment-runbook.md)** - **PROD SETUP**: Step-by-step "Zero-to-Hero" guide for deploying to a new AWS account from scratch.
 
 ---
 

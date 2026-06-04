@@ -68,9 +68,14 @@ bash scripts/validate-local.sh
 *See [Local Testing Guide](./docs/local-testing.md) for details.*
 
 ### Cloud Deployment (AWS EKS)
-Provision the production infrastructure using Terraform:
-1.  Navigate to `infra/terraform/environments/manager/`.
-2.  Run `terraform init && terraform plan`.
+Provision the production infrastructure securely using the [EKS Deployment Runbook](./docs/eks-deployment-runbook.md).
+
+This guide covers:
+1.  **Phase 1: Local Bootstrap** - Establish OIDC trust manually.
+2.  **Phase 2: Management** - Automated VPC/EKS deployment.
+3.  **Phase 3: Cluster Hardening** - RBAC and Security Policies.
+4.  **Phase 4: App CI/CD** - Secretless application deployment.
+
 *See [EKS vs Kind Authentication](./docs/eks-vs-kind-auth.md) for architectural differences.*
 
 Important demo scope note:

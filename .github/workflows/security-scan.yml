@@ -1,0 +1,53 @@
+name: Security Hardening (Trivy & Checkov)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  checkov:
+    name: Checkov (IaC Scan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          # Targets both Terraform infrastructure and Kubernetes manifests
+          directory: .
+          framework: terraform,kubernetes,helm
+          quiet: true
+          soft_fail: false # Hard fail on high severity results
+          container_user: 1000 # Use non-root for GitHub-hosted runners
+          output_format: cli
+
+  trivy:
+    name: Trivy (Container & FS Scan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Trivy FS Scan (Vulnerabilities & Secrets)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          exit-code: '1' # Fail the build if vulnerabilities are found
+          severity: 'CRITICAL,HIGH'
+
+      - name: Trivy Image Vulnerability Scan
+        # This scans the Dockerfile before build to catch base image issues early
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'dummy-build-check' # Trivy supports scanning local contexts via Dockerfile
+          scan-type: 'config'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          template: './app/Dockerfile'
