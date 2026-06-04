@@ -41,7 +41,7 @@ variable "github_repo" {
 variable "github_subject_type" {
   description = "Use 'branch' or 'environment' for the GitHub trust scope."
   type        = string
-  default     = "branch"
+  default     = "environment"
 
   validation {
     condition     = contains(["branch", "environment"], var.github_subject_type)
@@ -52,7 +52,7 @@ variable "github_subject_type" {
 variable "github_subject_value" {
   description = "Branch name or environment name allowed to assume the CI role."
   type        = string
-  default     = "main"
+  default     = "dev"
 }
 
 variable "create_github_oidc_provider" {

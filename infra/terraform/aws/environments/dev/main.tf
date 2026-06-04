@@ -324,3 +324,18 @@ module "eks_cluster" {
 
   tags = local.common_tags
 }
+
+import {
+  to = module.eks_cluster.aws_eks_access_entry.this["github_actions_terraform"]
+  id = "${var.cluster_name}:arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.name_prefix}-gha-terraform"
+}
+
+import {
+  to = module.eks_cluster.aws_eks_access_entry.this["github_actions_deploy_staging"]
+  id = "${var.cluster_name}:arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.name_prefix}-gha-eks-deploy-staging"
+}
+
+import {
+  to = module.eks_cluster.aws_eks_access_entry.this["github_actions_deploy_dev"]
+  id = "${var.cluster_name}:arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.name_prefix}-gha-eks-deploy-dev"
+}
