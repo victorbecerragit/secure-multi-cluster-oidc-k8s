@@ -39,6 +39,26 @@ output "github_deploy_staging_subject" {
   value       = module.github_oidc_role_deploy_staging.github_subject
 }
 
+output "github_deploy_dev_subject" {
+  description = "Exact GitHub subject claim allowed to assume the deploy role."
+  value       = module.github_oidc_role_deploy_dev.github_subject
+}
+
+output "github_deploy_prod_role_arn" {
+  description = "IAM role ARN assumed by GitHub Actions for production deployments."
+  value       = module.github_oidc_role_deploy_prod.role_arn
+}
+
+output "github_deploy_staging_role_arn" {
+  description = "IAM role ARN assumed by GitHub Actions for staging deployments."
+  value       = module.github_oidc_role_deploy_staging.role_arn
+}
+
+output "github_deploy_dev_role_arn" {
+  description = "IAM role ARN assumed by GitHub Actions for dev deployments."
+  value       = module.github_oidc_role_deploy_dev.role_arn
+}
+
 output "github_build_role_arn" {
   description = "ECR build role ARN."
   value       = module.github_oidc_role_build.role_arn

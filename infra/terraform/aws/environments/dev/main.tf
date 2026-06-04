@@ -252,6 +252,21 @@ module "github_oidc_role_deploy_staging" {
   tags                       = local.common_tags
 }
 
+# Separate GitHub OIDC role for Kubernetes deployment only.
+module "github_oidc_role_deploy_dev" {
+  source = "../../modules/github-oidc-role"
+
+  role_name                  = "${var.name_prefix}-gha-eks-deploy-dev"
+  github_owner               = var.github_owner
+  github_repo                = var.github_repo
+  subject_type               = "environment"
+  subject_value              = "dev"
+  create_oidc_provider       = false
+  existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
+  inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
+  tags                       = local.common_tags
+}
+
 # Separate GitHub OIDC role for ECR build and push operations.
 # Scoped specifically for container image management in CI/CD workflows.
 module "github_oidc_role_build" {
@@ -292,9 +307,17 @@ module "eks_cluster" {
       access_scope_type = var.github_actions_eks_access_scope_type
       namespaces        = var.github_actions_eks_access_namespaces
     }
-    # Deploy role: group-only entry; permissions are managed by Kubernetes RBAC (ClusterRole/RoleBinding)
-    github_actions_deploy = {
+    # Deploy roles: group-only entries; permissions are managed by Kubernetes RBAC (ClusterRole/RoleBinding)
+    github_actions_deploy_prod = {
       principal_arn     = module.github_oidc_role_deploy_prod.role_arn
+      kubernetes_groups = ["github:ci-deployers"]
+    }
+    github_actions_deploy_staging = {
+      principal_arn     = module.github_oidc_role_deploy_staging.role_arn
+      kubernetes_groups = ["github:ci-deployers"]
+    }
+    github_actions_deploy_dev = {
+      principal_arn     = module.github_oidc_role_deploy_dev.role_arn
       kubernetes_groups = ["github:ci-deployers"]
     }
   }

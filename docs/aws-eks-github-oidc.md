@@ -93,7 +93,19 @@ This scaffold uses an explicit EKS access entry for the GitHub role rather than 
 - IAM role trust decides who can get AWS credentials.
 - EKS access entries decide what that role can do against the Kubernetes API.
 
-The default scaffold uses `AmazonEKSClusterAdminPolicy` so the end-to-end example is easy to validate. Narrow that to namespace-scoped or read-only policies once the bootstrap flow is proven out.
+### Environment-Based Least Privilege
+
+This project uses a dedicated OIDC role for each GitHub Environment (`dev`, `staging`, `prod`):
+
+| Environment | GitHub Subject Claim | IAM Role Name | Kubernetes Namespace Scope |
+|---|---|---|---|
+| `dev` | `repo:<owner>/<repo>:environment:dev` | `*-gha-eks-deploy-dev` | `app-dev` |
+| `staging` | `repo:<owner>/<repo>:environment:staging` | `*-gha-eks-deploy-staging` | `app-staging` |
+| `prod` | `repo:<owner>/<repo>:environment:prod` | `*-gha-eks-deploy-prod` | `app-prod` |
+
+This ensures that a compromised `dev` environment secret in GitHub cannot be used to deploy to `prod` in Kubernetes, even though both roles trust the same repository.
+
+The default scaffold uses `AmazonEKSClusterAdminPolicy` for the main infrastructure role so the end-to-end example is easy to validate. The deployment roles do not have managed policies; they rely on Kubernetes RBAC mapped via EKS Access Entries.
 
 The AWS IAM side is now scaffolded with an inline service-scoped policy instead of `AdministratorAccess`. Managed policies remain optional and default to an empty list.
 
