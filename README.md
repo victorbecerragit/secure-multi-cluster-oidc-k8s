@@ -73,6 +73,12 @@ Provision the production infrastructure using Terraform:
 2.  Run `terraform init && terraform plan`.
 *See [EKS vs Kind Authentication](./docs/eks-vs-kind-auth.md) for architectural differences.*
 
+Important demo scope note:
+- This repository demonstrates EKS access from a public GitHub-hosted runner using an EKS public API endpoint.
+- This pattern is for demo and learning purposes.
+- For production, use a private GitHub runner in the same VPC (or securely connected private network) as EKS, and keep the EKS API endpoint private.
+- Private GitHub runner implementation is out of scope for this project.
+
 ---
 
 ## 🗺️ Local Architecture Diagram

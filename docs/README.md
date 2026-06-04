@@ -21,6 +21,10 @@ Complete technical documentation for secure multi-cluster Kubernetes OIDC federa
 - ✅ Atomic deployments with rollback
 - ✅ Comprehensive pre/post-deployment validation
 
+### Security Review Reference
+
+- **[security-assessment-2026-06-04.md](./security-assessment-2026-06-04.md)** - Independent architecture and configuration assessment with prioritized hardening recommendations
+
 ---
 
 ## 🏗️ Architecture & Design
