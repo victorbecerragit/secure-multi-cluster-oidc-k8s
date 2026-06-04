@@ -96,7 +96,7 @@ By default, newly created clusters may block your local IAM identity even if you
 # Example mapping for local connectivity
 local_dev_user = {
   principal_arn     = "arn:aws:iam::<account-id>:user/<username>"
-  kubernetes_groups = ["system:masters"]
+  kubernetes_groups = []
   policy_arn        = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
   access_scope_type = "cluster"
 }
