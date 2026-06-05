@@ -141,9 +141,13 @@ jobs:
 
           kubectl get --raw='/version' > /dev/null
           echo "API server reachable."
-          expect_yes "kubectl auth can-i get namespaces"
-          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
-          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          
+          # Low-risk positive check: confirms authenticated cluster visibility.
+          expect_yes "kubectl auth can-i get pods --all-namespaces --namespace=''"
+          
+          # Guardrails must hold before any resource apply.
+          expect_no "kubectl auth can-i create clusterroles --namespace=''"
+          expect_no "kubectl auth can-i create clusterrolebindings --namespace=''"
           expect_no "kubectl auth can-i get secrets -n ${{ steps.select_role.outputs.target_namespace }}"
           echo "All preflight authorization checks passed."
 
@@ -176,8 +180,10 @@ jobs:
           source scripts/github-actions/k8s-auth-helpers.sh
           TARGET_NAMESPACE="${{ steps.select_role.outputs.target_namespace }}"
           expect_yes "kubectl auth can-i get deployments -n ${TARGET_NAMESPACE}"
-          expect_no "kubectl auth can-i create clusterroles.rbac.authorization.k8s.io"
-          expect_no "kubectl auth can-i create clusterrolebindings.rbac.authorization.k8s.io"
+          
+          # Guardrails must remain denied after applies.
+          expect_no "kubectl auth can-i create clusterroles --namespace=''"
+          expect_no "kubectl auth can-i create clusterrolebindings --namespace=''"
           expect_no "kubectl auth can-i get secrets -n ${TARGET_NAMESPACE}"
           echo "Post-deployment guardrails verified."
 
