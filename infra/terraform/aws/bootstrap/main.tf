@@ -61,8 +61,8 @@ module "github_oidc_role_deploy_prod" {
   role_name                  = "${var.name_prefix}-gha-eks-deploy-prod"
   github_owner               = var.github_owner
   github_repo                = var.github_repo
-  subject_type               = "environment"
-  subject_value              = "prod"
+  subject_type               = "branch"
+  subject_value              = "main"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
@@ -75,7 +75,7 @@ module "github_oidc_role_deploy_staging" {
   role_name                  = "${var.name_prefix}-gha-eks-deploy-staging"
   github_owner               = var.github_owner
   github_repo                = var.github_repo
-  subject_type               = "environment"
+  subject_type               = "branch"
   subject_value              = "staging"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
@@ -89,8 +89,8 @@ module "github_oidc_role_deploy_dev" {
   role_name                  = "${var.name_prefix}-gha-eks-deploy-dev"
   github_owner               = var.github_owner
   github_repo                = var.github_repo
-  subject_type               = "environment"
-  subject_value              = "dev"
+  subject_type               = "branch"
+  subject_value              = "develop"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
