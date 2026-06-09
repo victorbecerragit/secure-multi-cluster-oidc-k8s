@@ -35,10 +35,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials via GitHub OIDC (build role)
+        id: aws_auth
+        continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_GITHUB_BUILD_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Skip if OIDC role is missing
+        if: steps.aws_auth.outcome != 'success'
+        run: |
+          echo "AWS OIDC Role assumption failed (Build Role). The role might not exist or has been deleted."
+          echo "Skipping workflow."
+          exit 0
 
       - name: Login to Amazon ECR
         id: login-ecr
