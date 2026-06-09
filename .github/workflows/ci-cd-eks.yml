@@ -151,14 +151,15 @@ jobs:
           expect_no "kubectl auth can-i get secrets -n ${{ steps.select_role.outputs.target_namespace }}"
           echo "All preflight authorization checks passed."
 
-      - name: Validate bootstrap infrastructure exists
+      - name: Validate namespaces exist (created by bootstrap)
         shell: bash
         run: |
           set -euo pipefail
-          kubectl get namespace "${{ steps.select_role.outputs.target_namespace }}" > /dev/null || {
-            echo "Namespace ${{ steps.select_role.outputs.target_namespace }} not found (bootstrap infrastructure missing)."; exit 1;
+          TARGET_NS="${{ steps.select_role.outputs.target_namespace }}"
+          kubectl get namespace "${TARGET_NS}" > /dev/null || {
+            echo "Namespace ${TARGET_NS} not found (bootstrap infrastructure missing)."; exit 1;
           }
-          echo "Bootstrap namespace validated: ${{ steps.select_role.outputs.target_namespace }}"
+          echo "Bootstrap namespace validated: ${TARGET_NS}"
 
       - name: Helm chart lint (detect configuration errors early)
         shell: bash
