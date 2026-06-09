@@ -10,6 +10,12 @@ variable "name_prefix" {
   default     = "secure-mc"
 }
 
+variable "deploy_role_name_prefix" {
+  description = "Prefix used to look up the GitHub deploy IAM roles created by bootstrap. Defaults to name_prefix. Override if bootstrap was applied with a different prefix (e.g. 'kube-refresh-dev')."
+  type        = string
+  default     = ""
+}
+
 variable "cluster_name" {
   description = "Name of the dev EKS cluster."
   type        = string

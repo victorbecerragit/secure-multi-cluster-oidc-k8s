@@ -14,6 +14,10 @@ locals {
   azs         = slice(data.aws_availability_zones.available.names, 0, 2)
   role_prefix = "${var.name_prefix}-"
 
+  # Allow callers to override the prefix used for bootstrap-managed deploy roles.
+  # Needed when bootstrap was applied with a different name_prefix than this env.
+  deploy_role_prefix = var.deploy_role_name_prefix != "" ? var.deploy_role_name_prefix : var.name_prefix
+
   common_tags = merge({
     Project     = "secure-multi-cluster-oidc-k8s"
     Environment = "dev"
@@ -216,15 +220,15 @@ module "github_oidc_role" {
 # ARNs in the EKS access entries below.
 # ----------------------------------------------------------------------------
 data "aws_iam_role" "github_oidc_role_deploy_prod" {
-  name = "${var.name_prefix}-gha-eks-deploy-prod"
+  name = "${local.deploy_role_prefix}-gha-eks-deploy-prod"
 }
 
 data "aws_iam_role" "github_oidc_role_deploy_staging" {
-  name = "${var.name_prefix}-gha-eks-deploy-staging"
+  name = "${local.deploy_role_prefix}-gha-eks-deploy-staging"
 }
 
 data "aws_iam_role" "github_oidc_role_deploy_dev" {
-  name = "${var.name_prefix}-gha-eks-deploy-dev"
+  name = "${local.deploy_role_prefix}-gha-eks-deploy-dev"
 }
 
 # Separate GitHub OIDC role for ECR build and push operations.

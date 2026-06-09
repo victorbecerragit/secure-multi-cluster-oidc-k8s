@@ -1,6 +1,9 @@
 aws_region    = "us-east-1"
 cluster_name  = "secure-dev-eks"
 name_prefix   = "secure-mc"
+# Set this if bootstrap was applied with a different name_prefix than above.
+# Example: deploy_role_name_prefix = "kube-refresh-dev"
+# deploy_role_name_prefix = ""
 github_owner  = "victorbecerragit"
 github_repo   = "secure-multi-cluster-oidc-k8s"
 
