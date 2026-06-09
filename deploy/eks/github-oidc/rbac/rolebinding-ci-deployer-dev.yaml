@@ -1,0 +1,24 @@
+# Binds the github:ci-deployers Kubernetes group to the github-ci-deployer ClusterRole
+# in the app-dev namespace only.
+#
+# Subject comes from the EKS access entry in Terraform:
+#   kubernetes_groups = ["github:ci-deployers"]
+#
+# The IAM role that maps to this group is: ${name_prefix}-gha-eks-deploy-dev
+# Trust subject: repo:<owner>/<repo>:environment:dev
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-ci-deployer
+  namespace: app-dev
+  labels:
+    app.kubernetes.io/managed-by: kubectl
+    rbac.example.com/persona: github-ci-deployers
+subjects:
+  - kind: Group
+    name: "github:ci-deployers"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: github-ci-deployer
+  apiGroup: rbac.authorization.k8s.io
