@@ -16,7 +16,7 @@ role_name = "github-actions-oidc-role"
 
 # Must match name_prefix and cluster_name in environments/dev/terraform.tfvars
 # so the deploy roles are named consistently.
-name_prefix  = "kube-refresh-dev"
+name_prefix  = "secure-mc"
 cluster_name = "kube-refresh-dev"
 
 # Managed policies attached to the bootstrap role used by GitHub Actions.
