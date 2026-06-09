@@ -178,7 +178,7 @@ jobs:
 
       - name: Install Helm
         if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
 
       - name: Build kubeconfig for EKS cluster
         if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
