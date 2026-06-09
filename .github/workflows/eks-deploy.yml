@@ -18,8 +18,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: dev
-    # Dedicated deploy role. Keep separate from Terraform role.
-    if: ${{ vars.AWS_GITHUB_DEPLOY_ROLE_ARN != '' }}
+    # Dedicated deploy role. Skip if OIDC role or Cluster Name is not set (indicates cluster not ready/deleted).
+    if: ${{ vars.AWS_GITHUB_DEPLOY_ROLE_ARN != '' && vars.AWS_EKS_CLUSTER_NAME != '' }}
 
     steps:
       - name: Checkout
