@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/terraform-aws-eks-manage.yml"
       - "infra/terraform/aws/**"
+      - "deploy/eks/github-oidc/**"
+      - "policies/network/**"
   pull_request:
     paths:
       - ".github/workflows/terraform-aws-eks-manage.yml"
@@ -89,3 +91,120 @@ jobs:
       - name: Terraform destroy
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'destroy' && github.event.inputs.confirm_destroy == 'DESTROY' }}
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} destroy -lock=false -input=false -auto-approve
+
+  # ---------------------------------------------------------------------------
+  # K8s Hardening: RBAC + NetworkPolicy setup
+  #
+  # Runs only after a successful apply (push or workflow_dispatch apply).
+  # Uses the dedicated deploy role (not the Terraform infra role) so that
+  # least-privilege is enforced: this job cannot modify AWS infrastructure.
+  # Skipped on plan, destroy, and PR runs where no live cluster is expected.
+  # ---------------------------------------------------------------------------
+  k8s-hardening:
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: terraform
+    # Only run after an actual apply, not on plan/destroy/PR.
+    if: |
+      vars.AWS_GITHUB_DEPLOY_ROLE_ARN != '' &&
+      vars.AWS_EKS_CLUSTER_NAME != '' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.operation == 'apply'))
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via GitHub OIDC (deploy role)
+        id: aws_auth
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Graceful exit if auth failed
+        id: gate
+        if: steps.aws_auth.outcome != 'success'
+        run: |
+          echo "Deploy role auth failed. Cluster may not be ready yet or role does not exist."
+          echo "should_skip=true" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Verify EKS cluster is reachable
+        if: steps.gate.outputs.should_skip != 'true'
+        id: check_cluster
+        shell: bash
+        run: |
+          if ! aws eks describe-cluster --name "${{ vars.AWS_EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION }}" > /dev/null 2>&1; then
+            echo "::warning:: EKS Cluster ${{ vars.AWS_EKS_CLUSTER_NAME }} not found. Skipping k8s hardening."
+            echo "should_skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install kubectl
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
+        uses: azure/setup-kubectl@v4
+
+      - name: Build kubeconfig for EKS
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
+        run: aws eks update-kubeconfig --name "${{ vars.AWS_EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION }}"
+
+      - name: Preflight validation (reachability + guardrails)
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/github-actions/k8s-auth-helpers.sh
+
+          kubectl get --raw='/version' > /dev/null
+
+          expect_yes "kubectl auth can-i get pods --all-namespaces --namespace=''"
+
+          expect_no "kubectl auth can-i create clusterroles --namespace=''"
+          expect_no "kubectl auth can-i create clusterrolebindings --namespace=''"
+          expect_no "kubectl auth can-i get secrets -n app-dev"
+          expect_no "kubectl auth can-i get secrets -n app-prod"
+          expect_no "kubectl auth can-i get secrets -n app-staging"
+
+      - name: Apply namespace-scoped RBAC
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
+        run: |
+          set -euo pipefail
+          kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-dev.yaml
+          kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-prod.yaml
+          kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-staging.yaml
+
+      - name: Post-RBAC authorization validation
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/github-actions/k8s-auth-helpers.sh
+
+          expect_yes "kubectl auth can-i create deployments.apps -n app-dev"
+          expect_yes "kubectl auth can-i patch deployments.apps -n app-dev"
+          expect_yes "kubectl auth can-i create deployments.apps -n app-prod"
+          expect_yes "kubectl auth can-i patch deployments.apps -n app-prod"
+          expect_yes "kubectl auth can-i create deployments.apps -n app-staging"
+          expect_yes "kubectl auth can-i patch deployments.apps -n app-staging"
+
+          expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-dev"
+          expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-prod"
+          expect_yes "kubectl auth can-i create networkpolicies.networking.k8s.io -n app-staging"
+
+          expect_no "kubectl auth can-i create clusterroles --namespace=''"
+          expect_no "kubectl auth can-i create clusterrolebindings --namespace=''"
+          expect_no "kubectl auth can-i get secrets -n app-dev"
+          expect_no "kubectl auth can-i get secrets -n app-prod"
+          expect_no "kubectl auth can-i get secrets -n app-staging"
+
+      - name: Apply network policies
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
+        run: |
+          set -euo pipefail
+          kubectl apply -f policies/network/baseline-allow.yaml
+          kubectl apply -n app-dev -f policies/network/default-deny.yaml
+          kubectl apply -n app-prod -f policies/network/default-deny.yaml
+          kubectl apply -n app-staging -f policies/network/default-deny.yaml
+
