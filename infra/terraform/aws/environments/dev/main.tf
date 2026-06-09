@@ -208,63 +208,23 @@ module "github_oidc_role" {
   tags                       = local.common_tags
 }
 
-# Security intent: the deploy role only needs DescribeCluster to build a kubeconfig.
-# All kubectl permissions are controlled by Kubernetes RBAC via the github:ci-deployers group.
-data "aws_iam_policy_document" "github_actions_deploy" {
-  statement {
-    sid       = "EksDescribeOnly"
-    actions   = ["eks:DescribeCluster"]
-    resources = ["arn:${data.aws_partition.current.partition}:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.cluster_name}"]
-  }
+# ----------------------------------------------------------------------------
+# GitHub Actions deploy roles
+#
+# These roles are managed in the bootstrap layer so they survive cluster
+# destroy/recreate cycles. We look them up here by name and reference their
+# ARNs in the EKS access entries below.
+# ----------------------------------------------------------------------------
+data "aws_iam_role" "github_oidc_role_deploy_prod" {
+  name = "${var.name_prefix}-gha-eks-deploy-prod"
 }
 
-# Separate GitHub OIDC role for Kubernetes deployment only.
-# This role CANNOT modify infrastructure – it is scoped purely to kubectl apply operations
-# through Kubernetes RBAC, keeping infra provisioning and app deployment as separate identities.
-module "github_oidc_role_deploy_prod" {
-  source = "../../modules/github-oidc-role"
-
-  role_name                  = "${var.name_prefix}-gha-eks-deploy-prod"
-  github_owner               = var.github_owner
-  github_repo                = var.github_repo
-  subject_type               = "environment"
-  subject_value              = "prod"
-  create_oidc_provider       = false
-  existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
-  inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
-  tags                       = local.common_tags
+data "aws_iam_role" "github_oidc_role_deploy_staging" {
+  name = "${var.name_prefix}-gha-eks-deploy-staging"
 }
 
-# Separate GitHub OIDC role for Kubernetes deployment only.
-# This role CANNOT modify infrastructure – it is scoped purely to kubectl apply operations
-# through Kubernetes RBAC, keeping infra provisioning and app deployment as separate identities.
-module "github_oidc_role_deploy_staging" {
-  source = "../../modules/github-oidc-role"
-
-  role_name                  = "${var.name_prefix}-gha-eks-deploy-staging"
-  github_owner               = var.github_owner
-  github_repo                = var.github_repo
-  subject_type               = "environment"
-  subject_value              = "staging"
-  create_oidc_provider       = false
-  existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
-  inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
-  tags                       = local.common_tags
-}
-
-# Separate GitHub OIDC role for Kubernetes deployment only.
-module "github_oidc_role_deploy_dev" {
-  source = "../../modules/github-oidc-role"
-
-  role_name                  = "${var.name_prefix}-gha-eks-deploy-dev"
-  github_owner               = var.github_owner
-  github_repo                = var.github_repo
-  subject_type               = "environment"
-  subject_value              = "dev"
-  create_oidc_provider       = false
-  existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
-  inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
-  tags                       = local.common_tags
+data "aws_iam_role" "github_oidc_role_deploy_dev" {
+  name = "${var.name_prefix}-gha-eks-deploy-dev"
 }
 
 # Separate GitHub OIDC role for ECR build and push operations.
@@ -309,15 +269,15 @@ module "eks_cluster" {
     }
     # Deploy roles: group-only entries; permissions are managed by Kubernetes RBAC (ClusterRole/RoleBinding)
     github_actions_deploy_prod = {
-      principal_arn     = module.github_oidc_role_deploy_prod.role_arn
+      principal_arn     = data.aws_iam_role.github_oidc_role_deploy_prod.arn
       kubernetes_groups = ["github:ci-deployers"]
     }
     github_actions_deploy_staging = {
-      principal_arn     = module.github_oidc_role_deploy_staging.role_arn
+      principal_arn     = data.aws_iam_role.github_oidc_role_deploy_staging.arn
       kubernetes_groups = ["github:ci-deployers"]
     }
     github_actions_deploy_dev = {
-      principal_arn     = module.github_oidc_role_deploy_dev.role_arn
+      principal_arn     = data.aws_iam_role.github_oidc_role_deploy_dev.arn
       kubernetes_groups = ["github:ci-deployers"]
     }
     # Local developer access (YOU)
@@ -332,17 +292,3 @@ module "eks_cluster" {
   tags = local.common_tags
 }
 
-import {
-  to = module.eks_cluster.aws_eks_access_entry.this["github_actions_terraform"]
-  id = "${var.cluster_name}:arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.name_prefix}-gha-terraform"
-}
-
-import {
-  to = module.eks_cluster.aws_eks_access_entry.this["github_actions_deploy_staging"]
-  id = "${var.cluster_name}:arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.name_prefix}-gha-eks-deploy-staging"
-}
-
-import {
-  to = module.eks_cluster.aws_eks_access_entry.this["github_actions_deploy_dev"]
-  id = "${var.cluster_name}:arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.name_prefix}-gha-eks-deploy-dev"
-}

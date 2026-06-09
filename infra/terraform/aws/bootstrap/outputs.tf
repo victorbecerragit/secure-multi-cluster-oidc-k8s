@@ -17,3 +17,19 @@ output "github_subject_claim" {
   description = "Exact subject claim allowed by the trust policy. Useful for debugging trust policy mismatches."
   value       = module.github_oidc_role.github_subject
 }
+
+output "github_oidc_role_deploy_prod_arn" {
+  description = "ARN of the GitHub Actions deploy role for the prod environment. Reference this in the EKS access entry."
+  value       = module.github_oidc_role_deploy_prod.role_arn
+}
+
+output "github_oidc_role_deploy_staging_arn" {
+  description = "ARN of the GitHub Actions deploy role for the staging environment. Reference this in the EKS access entry."
+  value       = module.github_oidc_role_deploy_staging.role_arn
+}
+
+output "github_oidc_role_deploy_dev_arn" {
+  description = "ARN of the GitHub Actions deploy role for the dev environment. Reference this in the EKS access entry."
+  value       = module.github_oidc_role_deploy_dev.role_arn
+}
+

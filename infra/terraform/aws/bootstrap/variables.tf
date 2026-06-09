@@ -43,6 +43,16 @@ variable "managed_policy_arns" {
   default     = ["arn:aws:iam::aws:policy/AdministratorAccess"]
 }
 
+variable "name_prefix" {
+  description = "Prefix used for all deploy role names (e.g. 'kube-refresh-dev'). Should match the name_prefix in the target environment."
+  type        = string
+}
+
+variable "cluster_name" {
+  description = "EKS cluster name. Used to scope the deploy role's eks:DescribeCluster permission."
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

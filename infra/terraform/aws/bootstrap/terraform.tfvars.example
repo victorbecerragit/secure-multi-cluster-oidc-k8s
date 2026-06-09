@@ -14,6 +14,11 @@ github_subject_value = "dev"
 # IAM role name (will be prefixed with account ID for uniqueness)
 role_name = "github-actions-oidc-role"
 
+# Must match name_prefix and cluster_name in environments/dev/terraform.tfvars
+# so the deploy roles are named consistently.
+name_prefix  = "kube-refresh-dev"
+cluster_name = "kube-refresh-dev"
+
 # Managed policies attached to the bootstrap role used by GitHub Actions.
 # You can replace this with a custom least-privilege policy ARN later.
 managed_policy_arns = [
