@@ -89,8 +89,8 @@ module "github_oidc_role_deploy_dev" {
   role_name                  = "${var.name_prefix}-gha-eks-deploy-dev"
   github_owner               = var.github_owner
   github_repo                = var.github_repo
-  subject_type               = "branch"
-  subject_value              = "develop"
+  subject_type               = "environment"
+  subject_value              = "dev"
   create_oidc_provider       = false
   existing_oidc_provider_arn = module.github_oidc_role.oidc_provider_arn
   inline_policy_json         = data.aws_iam_policy_document.github_actions_deploy.json
