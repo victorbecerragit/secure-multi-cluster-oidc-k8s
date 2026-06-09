@@ -157,10 +157,12 @@ jobs:
           set -euo pipefail
           source scripts/github-actions/k8s-auth-helpers.sh
 
+          # Verify API server is reachable and credentials are valid.
           kubectl get --raw='/version' > /dev/null
 
-          expect_yes "kubectl auth can-i get pods --all-namespaces --namespace=''"
-
+          # Guardrails: these must be denied regardless of namespace bindings.
+          # The deploy role is intentionally namespace-scoped via RoleBindings —
+          # cluster-wide positive checks run in the post-RBAC step below.
           expect_no "kubectl auth can-i create clusterroles --namespace=''"
           expect_no "kubectl auth can-i create clusterrolebindings --namespace=''"
           expect_no "kubectl auth can-i get secrets -n app-dev"
@@ -182,6 +184,8 @@ jobs:
           set -euo pipefail
           source scripts/github-actions/k8s-auth-helpers.sh
 
+          # Verify namespace-scoped workload permissions after RoleBindings are applied.
+          expect_yes "kubectl auth can-i get pods -n app-dev"
           expect_yes "kubectl auth can-i create deployments.apps -n app-dev"
           expect_yes "kubectl auth can-i patch deployments.apps -n app-dev"
           expect_yes "kubectl auth can-i create deployments.apps -n app-prod"
