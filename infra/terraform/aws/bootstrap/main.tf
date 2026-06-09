@@ -45,9 +45,13 @@ module "github_oidc_role" {
 
 data "aws_iam_policy_document" "github_actions_deploy" {
   statement {
-    sid       = "EksDescribeOnly"
-    actions   = ["eks:DescribeCluster"]
-    resources = ["arn:${data.aws_partition.current.partition}:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.cluster_name}"]
+    sid     = "EksDescribeOnly"
+    actions = ["eks:DescribeCluster"]
+    # Scoped to all clusters in the account/region. Limiting to a specific cluster
+    # name here creates an operational dependency on bootstrap being re-applied every
+    # time the cluster is renamed or recreated. eks:DescribeCluster is read-only
+    # metadata; the deploy role's actual permissions are enforced by Kubernetes RBAC.
+    resources = ["arn:${data.aws_partition.current.partition}:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/*"]
   }
 }
 

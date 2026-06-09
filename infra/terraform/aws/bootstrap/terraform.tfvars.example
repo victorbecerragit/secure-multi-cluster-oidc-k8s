@@ -14,10 +14,12 @@ github_subject_value = "dev"
 # IAM role name (will be prefixed with account ID for uniqueness)
 role_name = "github-actions-oidc-role"
 
-# Must match name_prefix and cluster_name in environments/dev/terraform.tfvars
-# so the deploy roles are named consistently.
+# Must match name_prefix in environments/dev/terraform.tfvars so deploy roles
+# are named consistently (e.g. {name_prefix}-gha-eks-deploy-dev).
+# cluster_name is no longer required: the deploy role's eks:DescribeCluster
+# policy now uses a wildcard resource (cluster/*) to avoid re-applying bootstrap
+# every time the cluster is renamed or recreated.
 name_prefix  = "secure-mc"
-cluster_name = "kube-refresh-dev"
 
 # Managed policies attached to the bootstrap role used by GitHub Actions.
 # You can replace this with a custom least-privilege policy ARN later.

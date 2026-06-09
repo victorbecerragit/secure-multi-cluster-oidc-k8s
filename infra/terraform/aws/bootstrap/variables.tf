@@ -48,11 +48,6 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "cluster_name" {
-  description = "EKS cluster name. Used to scope the deploy role's eks:DescribeCluster permission."
-  type        = string
-}
-
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)
