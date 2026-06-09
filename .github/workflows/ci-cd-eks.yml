@@ -42,11 +42,11 @@ jobs:
           role-to-assume: ${{ vars.AWS_GITHUB_BUILD_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Skip if OIDC role is missing
+      - name: Graceful exit if OIDC role is missing
         if: steps.aws_auth.outcome != 'success'
         run: |
-          echo "AWS OIDC Role assumption failed (Build Role). The role might not exist or has been deleted."
-          echo "Skipping workflow."
+          echo "AWS OIDC Role assumption failed (Build Role). The role might not exist in AWS or has been deleted."
+          echo "Gracefully exiting to avoid pipeline failure on deleted/not-yet-ready infrastructure."
           exit 0
 
       - name: Login to Amazon ECR
@@ -125,12 +125,21 @@ jobs:
           fi
 
       - name: Configure AWS Credentials via GitHub OIDC (deploy role)
+        id: aws_auth_deploy
+        continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ steps.select_role.outputs.role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Graceful exit if deploy role is missing
+        if: steps.aws_auth_deploy.outcome != 'success'
+        run: |
+          echo "AWS OIDC Role assumption failed (Deploy Role). Skipping deployment."
+          exit 0
+
       - name: Install kubectl
+        if: steps.aws_auth_deploy.outcome == 'success'
         uses: azure/setup-kubectl@v4
 
       - name: Install Helm
