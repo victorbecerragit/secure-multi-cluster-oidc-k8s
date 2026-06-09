@@ -43,23 +43,40 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Graceful exit if OIDC role is missing
+        id: gate
         if: steps.aws_auth.outcome != 'success'
         run: |
           echo "AWS OIDC Role assumption failed (Build Role). The role might not exist in AWS or has been deleted."
           echo "Gracefully exiting to avoid pipeline failure on deleted/not-yet-ready infrastructure."
+          echo "should_skip=true" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Verify EKS Cluster existence
+        if: steps.gate.outputs.should_skip != 'true'
+        id: check_cluster
+        shell: bash
+        run: |
+          if ! aws eks describe-cluster --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}" > /dev/null 2>&1; then
+            echo "::warning:: EKS Cluster ${EKS_CLUSTER_NAME} not found. Skipping build."
+            echo "should_skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Login to Amazon ECR
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Ensure ECR repository exists
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
           aws ecr describe-repositories --repository-names "${ECR_REPOSITORY}" >/dev/null 2>&1 ||           aws ecr create-repository --repository-name "${ECR_REPOSITORY}" >/dev/null
 
       - name: Compute image metadata
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         id: meta
         shell: bash
         run: |
@@ -72,6 +89,7 @@ jobs:
           echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
 
       - name: Build container image
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -79,6 +97,7 @@ jobs:
           docker build -t "${{ steps.meta.outputs.image_uri }}" .
 
       - name: Trivy Image Vulnerability Scan
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.meta.outputs.image_uri }}
@@ -89,6 +108,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Push container image
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -133,25 +153,42 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Graceful exit if deploy role is missing
+        id: gate_deploy
         if: steps.aws_auth_deploy.outcome != 'success'
         run: |
           echo "AWS OIDC Role assumption failed (Deploy Role). Skipping deployment."
+          echo "should_skip=true" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Verify EKS Cluster existence (deploy)
+        if: steps.gate_deploy.outputs.should_skip != 'true'
+        id: check_cluster_deploy
+        shell: bash
+        run: |
+          if ! aws eks describe-cluster --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}" > /dev/null 2>&1; then
+            echo "::warning:: EKS Cluster ${EKS_CLUSTER_NAME} not found. Skipping deployment."
+            echo "should_skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install kubectl
-        if: steps.aws_auth_deploy.outcome == 'success'
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         uses: azure/setup-kubectl@v4
 
       - name: Install Helm
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         uses: azure/setup-helm@v4
 
       - name: Build kubeconfig for EKS cluster
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
           aws eks update-kubeconfig  --name "${EKS_CLUSTER_NAME}"  --region "${AWS_REGION}"
 
       - name: Preflight validation (authorization & infrastructure checks)
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -170,6 +207,7 @@ jobs:
           echo "All preflight authorization checks passed."
 
       - name: Validate namespaces exist (created by bootstrap)
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -180,6 +218,7 @@ jobs:
           echo "Bootstrap namespace validated: ${TARGET_NS}"
 
       - name: Helm chart lint (detect configuration errors early)
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -187,12 +226,14 @@ jobs:
           echo "Helm chart passed lint."
 
       - name: Deploy application with Helm
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
           helm upgrade --install "${HELM_RELEASE}" helm/charts/myapp --namespace "${{ steps.select_role.outputs.target_namespace }}"  --values "${{ steps.select_role.outputs.values_file }}"  --set image.repository="${{ needs.build.outputs.image_repository }}"  --set-string image.tag="${{ needs.build.outputs.image_tag }}"  --atomic  --timeout 5m  --wait
 
       - name: Post-deployment validation (verify guardrails remain)
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -207,6 +248,7 @@ jobs:
           echo "Post-deployment guardrails verified."
 
       - name: Wait for deployment rollout
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         id: set_post_deploy_target
         run: |
@@ -218,6 +260,7 @@ jobs:
           echo "Deployment ${HELM_RELEASE} rolled out successfully."
 
       - name: Verify deployed image
+        if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail

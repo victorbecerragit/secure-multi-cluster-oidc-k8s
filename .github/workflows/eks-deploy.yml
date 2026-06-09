@@ -64,19 +64,35 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Graceful exit if auth failed
+        id: gate
         if: steps.check_role.outputs.skip == 'true' || steps.aws_auth.outcome != 'success'
         run: |
           echo "OIDC Authentication failed or was skipped. This is expected if the cluster was deleted or not yet bootstrapped."
+          echo "should_skip=true" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Verify EKS Cluster existence
+        if: steps.gate.outputs.should_skip != 'true'
+        id: check_cluster
+        shell: bash
+        run: |
+          if ! aws eks describe-cluster --name "${{ vars.AWS_EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION }}" > /dev/null 2>&1; then
+            echo "::warning:: EKS Cluster ${{ vars.AWS_EKS_CLUSTER_NAME }} not found. Skipping workflow."
+            echo "should_skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install kubectl
-        if: steps.aws_auth.outcome == 'success'
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         uses: azure/setup-kubectl@v4
 
       - name: Build kubeconfig for EKS
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         run: aws eks update-kubeconfig --name "${{ vars.AWS_EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION }}"
 
       - name: Preflight validation (reachability + guardrails)
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -98,6 +114,7 @@ jobs:
           expect_no "kubectl auth can-i get secrets -n app-staging"
 
       - name: Apply namespace-scoped RBAC
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         run: |
           set -euo pipefail
           # Namespace-scoped RBAC only. ClusterRole is bootstrap/platform-managed.
@@ -107,6 +124,7 @@ jobs:
           kubectl apply -f deploy/eks/github-oidc/rbac/rolebinding-ci-deployer-staging.yaml
 
       - name: Post-RBAC authorization validation
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -133,6 +151,7 @@ jobs:
           expect_no "kubectl auth can-i get secrets -n app-staging"
 
       - name: Apply network policies (additive allow-list)
+        if: steps.gate.outputs.should_skip != 'true' && steps.check_cluster.outputs.should_skip != 'true'
         run: |
           set -euo pipefail
           # NetworkPolicies are additive (union semantics): traffic allowed by *any*
