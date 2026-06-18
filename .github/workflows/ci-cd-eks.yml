@@ -176,7 +176,7 @@ jobs:
 
       - name: Install kubectl
         if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Install Helm
         if: steps.gate_deploy.outputs.should_skip != 'true' && steps.check_cluster_deploy.outputs.should_skip != 'true'
